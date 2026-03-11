@@ -1,8 +1,15 @@
 import { creditCardsData } from '../data/mockData';
 
-export default function RecommendationSidebar() {
-  // Grab the top 3 cards for recommendations mock
-  const topCards = creditCardsData.slice(4, 7); // Axis Magnus, Atlas, Select
+export default function RecommendationSidebar({ userCards = [] }) {
+  // Recommend cards the user doesn't already have, sorted by reward value
+  const userCardNames = new Set(userCards.map(c => c.Card_Name));
+  
+  const recommendations = creditCardsData
+    .filter(card => !userCardNames.has(card.Card_Name))
+    .sort((a, b) => b.Reward_Value_Per_Point_INR - a.Reward_Value_Per_Point_INR)
+    .slice(0, 3);
+
+  const hasRecommendations = recommendations.length > 0;
 
   return (
     <div className="sidebar-right">
@@ -10,60 +17,80 @@ export default function RecommendationSidebar() {
         <h2 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>Card Recommendations</h2>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {topCards.map((card, idx) => (
-          <div
-            key={card.Card_Name}
-            style={{
-              background: 'rgba(255, 255, 255, 0.4)',
-              border: '1px solid rgba(255, 255, 255, 0.6)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '16px',
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: 'var(--shadow-sm)'
-            }}
-          >
-            {/* Card Background gradient blur detail */}
-            <div style={{
-              position: 'absolute',
-              top: '-20px', right: '-20px',
-              width: '80px', height: '80px',
-              background: idx === 0 ? 'var(--accent-purple)' : 'var(--accent-cyan)',
-              opacity: 0.15,
-              borderRadius: '50%',
-              filter: 'blur(12px)',
-              pointerEvents: 'none'
-            }}></div>
-
-            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-              {card.Card_Name}
-            </div>
-            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-              {idx === 1 ? 'Best for travel rewards' : 'Best for premium lifestyle'}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              <div>
-                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Est. yearly rewards</div>
-                <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent-purple)' }}>₹{idx === 1 ? '3,200' : '8,500'}</div>
-              </div>
-              <button style={{
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-full)',
-                padding: '6px 12px',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                cursor: 'pointer'
-              }}>
-                View More
-              </button>
-            </div>
+      {!hasRecommendations ? (
+        <div style={{ 
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px',
+          padding: '40px 16px', textAlign: 'center'
+        }}>
+          <div style={{ fontSize: '36px', opacity: 0.3 }}>🎉</div>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            You've added all available cards!
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {recommendations.map((card, idx) => {
+            // Estimate yearly rewards: annual fee waiver threshold * reward rate
+            const estimatedRewards = (card.Reward_Value_Per_Point_INR * 10000).toLocaleString();
+            
+            // Choose a description based on card properties
+            let description = 'Good all-round card';
+            if (card.Lounge_Access === 'Unlimited Global') description = 'Best for travel & lounges';
+            else if (card.Reward_Type === 'Cashback') description = 'Best for cashback rewards';
+            else if (card.Reward_Type === 'Air Miles') description = 'Best for travel rewards';
+            else if (card.Reward_Value_Per_Point_INR >= 0.50) description = 'High reward value card';
+
+            return (
+              <div
+                key={card.Card_Name}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.4)',
+                  border: '1px solid rgba(255, 255, 255, 0.6)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '16px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                {/* Card Background gradient blur detail */}
+                <div style={{
+                  position: 'absolute',
+                  top: '-20px', right: '-20px',
+                  width: '80px', height: '80px',
+                  background: idx === 0 ? 'var(--accent-purple)' : idx === 1 ? 'var(--accent-cyan)' : 'var(--accent-green)',
+                  opacity: 0.15,
+                  borderRadius: '50%',
+                  filter: 'blur(12px)',
+                  pointerEvents: 'none'
+                }}></div>
+
+                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                  {card.Card_Name}
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                  {description}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>₹/point value</div>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--accent-purple)' }}>
+                      ₹{card.Reward_Value_Per_Point_INR.toFixed(2)}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Annual fee</div>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {card.Annual_Fee_INR === 0 ? 'FREE' : `₹${card.Annual_Fee_INR.toLocaleString()}`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <button style={{
         width: '100%',
