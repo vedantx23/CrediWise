@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
 import Instruments from './pages/Instruments';
 import Recommend from './pages/Recommend';
+import Profile from './pages/Profile';
 import { CardProvider } from './context/CardContext';
 import './index.css';
 
@@ -23,6 +24,7 @@ function ProtectedLayout() {
           <Route path="/cards" element={<Instruments />} />
           <Route path="/rewards" element={<Recommend />} />
           <Route path="/spending" element={<Expenses />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="/insights" element={<Dashboard />} />
         </Routes>
       </div>

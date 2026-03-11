@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, Link } from 'react-router-dom';
 import { FiSearch, FiBell } from 'react-icons/fi';
+import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
 const NAV_PILLS = [
@@ -11,6 +12,7 @@ const NAV_PILLS = [
 ];
 
 export default function Navbar() {
+  const { user } = useAuth();
   return (
     <nav className="navbar-top">
       {/* Left side: Logo */}
@@ -41,9 +43,9 @@ export default function Navbar() {
         <button className="icon-btn">
           <FiBell />
         </button>
-        <div className="profile-avatar">
-          <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Chetanya" alt="User Profile" />
-        </div>
+        <Link to="/profile" className="profile-avatar" title="View Profile">
+          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || 'User'}`} alt="User Profile" />
+        </Link>
       </div>
     </nav>
   );
