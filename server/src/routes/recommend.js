@@ -1,5 +1,4 @@
 const express = require('express');
-const { getDb } = require('../db/database');
 const { authMiddleware } = require('../middleware/auth');
 const { calculateRecommendations } = require('../services/rewardEngine');
 
@@ -7,7 +6,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 // POST /api/recommend
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   const { amount, category } = req.body;
 
   if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -18,7 +17,7 @@ router.post('/', (req, res) => {
   }
 
   try {
-    const result = calculateRecommendations(req.user.id, Number(amount), category);
+    const result = await calculateRecommendations(req.user.id, Number(amount), category);
     res.json(result);
   } catch (err) {
     console.error('Recommendation error:', err);

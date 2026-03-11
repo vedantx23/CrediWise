@@ -1,66 +1,119 @@
-const Database = require("better-sqlite3");
-const path = require("path");
-const fs = require("fs");
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 
-const DB_PATH = path.join(__dirname, "../../crediwise.db");
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/crediwise';
 
-let db;
-
-function getDb() {
-    if (!db) {
-        db = new Database(DB_PATH);
-        db.pragma("journal_mode = WAL");
-        db.pragma("foreign_keys = ON");
-        initializeSchema();
+async function connectDb() {
+    try {
+        await mongoose.connect(MONGODB_URI);
+        console.log('✅ Connected to MongoDB successfully');
+        await seedCardDirectory();
+        await seedDemoAccount();
+    } catch (err) {
+        console.error('❌ MongoDB connection error:', err);
+        throw err;
     }
-    return db;
 }
 
-function initializeSchema() {
-    db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'user',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
+async function seedCardDirectory() {
+    const Card = require('../models/Card');
+    const cards = [
+        {
+            name: 'HDFC Bank Regalia Gold',
+            bank: 'HDFC Bank',
+            type: 'credit',
+            network: 'Visa/Mastercard',
+            base_reward_rate: 1.33,
+            redemption_value: 0.5,
+            category_multipliers: { 'Travel': 5, 'Dining': 5 },
+            benefits: ['Lounge Access', 'Priority Pass', 'Insurance Cover']
+        },
+        {
+            name: 'Amazon Pay ICICI Bank Credit Card',
+            bank: 'ICICI Bank',
+            type: 'credit',
+            network: 'Visa',
+            base_reward_rate: 1.0,
+            redemption_value: 1.0,
+            category_multipliers: { 'Shopping': 5, 'Utilities': 2 },
+            benefits: ['Unlimited 5% back on Amazon for Prime members', 'No Joining Fee']
+        },
+        {
+            name: 'SBI Card ELITE',
+            bank: 'SBI Card',
+            type: 'credit',
+            network: 'Visa/Mastercard',
+            base_reward_rate: 0.5,
+            redemption_value: 0.25,
+            category_multipliers: { 'Dining': 5, 'Departmental Stores': 5, 'Grocery': 5 },
+            benefits: ['Movie Tickets', 'Lounge Access', 'Milestone Rewards']
+        },
+        {
+            name: 'Axis Bank Ace Credit Card',
+            bank: 'Axis Bank',
+            type: 'credit',
+            network: 'Visa',
+            base_reward_rate: 2.0,
+            redemption_value: 1.0,
+            category_multipliers: { 'Utilities': 5, 'Food Delivery': 4 },
+            benefits: ['Flat 2% Cashback', 'Lounge Access']
+        },
+        {
+            name: 'ICICI Bank Coral Contactless Card',
+            bank: 'ICICI Bank',
+            type: 'credit',
+            network: 'Visa/Mastercard',
+            base_reward_rate: 0.5,
+            redemption_value: 0.25,
+            category_multipliers: { 'Dining': 2 },
+            benefits: ['Movie Discounts', 'Lounge Access']
+        }
+    ];
 
-    CREATE TABLE IF NOT EXISTS payment_instruments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      name TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'credit_card',
-      base_reward_rate REAL NOT NULL DEFAULT 1.0,
-      redemption_value REAL NOT NULL DEFAULT 0.25,
-      milestone_threshold REAL DEFAULT NULL,
-      milestone_bonus REAL DEFAULT 0,
-      reward_cap REAL DEFAULT NULL,
-      category_multipliers TEXT NOT NULL DEFAULT '{}',
-      color TEXT DEFAULT '#6366f1',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS expenses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
-      date TEXT NOT NULL,
-      amount REAL NOT NULL,
-      category TEXT NOT NULL DEFAULT 'Other',
-      payment_instrument_id INTEGER,
-      note TEXT DEFAULT '',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (payment_instrument_id) REFERENCES payment_instruments(id) ON DELETE SET NULL
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
-    CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
-    CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
-    CREATE INDEX IF NOT EXISTS idx_instruments_user_id ON payment_instruments(user_id);
-  `);
+    try {
+        const count = await Card.countDocuments();
+        if (count === 0) {
+            console.log('🌱 Seeding card directory...');
+            await Card.insertMany(cards);
+            console.log('✅ Card directory seeded with 5 cards');
+        }
+    } catch (err) {
+        console.error('❌ Error seeding card directory:', err);
+    }
 }
 
-module.exports = { getDb };
+async function seedDemoAccount() {
+    const User = require('../models/User');
+    const UserCredential = require('../models/UserCredential');
+    const UserRepository = require('../repositories/UserRepository');
+
+    const demoEmail = 'demo@crediwise.com';
+    const demoPassword = 'password123';
+
+    try {
+        const existing = await User.findOne({ email: demoEmail });
+        if (!existing) {
+            console.log('🌱 Seeding demo account...');
+            const salt = bcrypt.genSaltSync(12);
+            const password_hash = bcrypt.hashSync(demoPassword, salt);
+            
+            await UserRepository.create({
+                name: 'Demo User',
+                email: demoEmail,
+                password_hash,
+                role: 'user'
+            });
+            console.log('✅ Demo account created: demo@crediwise.com / password123');
+        }
+    } catch (err) {
+        console.error('❌ Error seeding demo account:', err);
+    }
+}
+
+// Keeping getDb for compatibility during migration if needed, 
+// though repositories will use models directly.
+function getDb() {
+    return mongoose.connection;
+}
+
+module.exports = { connectDb, getDb };

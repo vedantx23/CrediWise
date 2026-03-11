@@ -1,74 +1,100 @@
 const express = require('express');
-const { getDb } = require('../db/database');
 const { authMiddleware } = require('../middleware/auth');
+const Expense = require('../models/Expense');
+const PaymentInstrument = require('../models/PaymentInstrument');
+const InstrumentRepository = require('../repositories/InstrumentRepository');
+const ExpenseRepository = require('../repositories/ExpenseRepository');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 router.use(authMiddleware);
 
 // GET /api/analytics/summary
-router.get('/summary', (req, res) => {
+router.get('/summary', async (req, res) => {
   try {
-    const db = getDb();
-    const userId = req.user.id;
+    const userId = new mongoose.Types.ObjectId(req.user.id);
 
     // Current month
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
     // Monthly totals (last 6 months)
-    const monthlyTotals = db.prepare(`
-      SELECT strftime('%Y-%m', date) as month, SUM(amount) as total
-      FROM expenses
-      WHERE user_id = ?
-      GROUP BY month
-      ORDER BY month DESC
-      LIMIT 6
-    `).all(userId).reverse();
+    const monthlyTotals = await Expense.aggregate([
+      { $match: { user_id: userId } },
+      { 
+        $group: { 
+          _id: { $substr: ["$date", 0, 7] }, 
+          total: { $sum: "$amount" } 
+        } 
+      },
+      { $project: { month: "$_id", total: 1, _id: 0 } },
+      { $sort: { month: -1 } },
+      { $limit: 6 }
+    ]);
+    monthlyTotals.reverse();
 
     // Category breakdown (current month)
-    const categoryBreakdown = db.prepare(`
-      SELECT category, SUM(amount) as total, COUNT(*) as count
-      FROM expenses
-      WHERE user_id = ? AND strftime('%Y-%m', date) = ?
-      GROUP BY category
-      ORDER BY total DESC
-    `).all(userId, currentMonth);
+    const categoryBreakdown = await Expense.aggregate([
+      { 
+        $match: { 
+          user_id: userId, 
+          date: { $regex: new RegExp(`^${currentMonth}`) } 
+        } 
+      },
+      { 
+        $group: { 
+          _id: "$category", 
+          total: { $sum: "$amount" },
+          count: { $sum: 1 }
+        } 
+      },
+      { $project: { category: "$_id", total: 1, count: 1, _id: 0 } },
+      { $sort: { total: -1 } }
+    ]);
 
     // Total spent this month
-    const monthTotal = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM expenses
-      WHERE user_id = ? AND strftime('%Y-%m', date) = ?
-    `).get(userId, currentMonth);
+    const monthTotalResult = await Expense.aggregate([
+      { 
+        $match: { 
+          user_id: userId, 
+          date: { $regex: new RegExp(`^${currentMonth}`) } 
+        } 
+      },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const monthTotal = monthTotalResult.length > 0 ? monthTotalResult[0].total : 0;
 
     // Total spent all time
-    const allTimeTotal = db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ?
-    `).get(userId);
+    const allTimeTotalResult = await Expense.aggregate([
+      { $match: { user_id: userId } },
+      { $group: { _id: null, total: { $sum: "$amount" } } }
+    ]);
+    const allTimeTotal = allTimeTotalResult.length > 0 ? allTimeTotalResult[0].total : 0;
 
     // Instrument count
-    const instrumentCount = db.prepare(`
-      SELECT COUNT(*) as count FROM payment_instruments WHERE user_id = ?
-    `).get(userId);
+    const instrumentCount = await PaymentInstrument.countDocuments({ user_id: userId });
 
     // Reward calculations per instrument (current month)
-    const instruments = db.prepare(
-      'SELECT * FROM payment_instruments WHERE user_id = ?'
-    ).all(userId);
+    const instruments = await PaymentInstrument.find({ user_id: userId });
 
     let totalRewardsValue = 0;
-    const instrumentSummaries = instruments.map(inst => {
-      const multipliers = JSON.parse(inst.category_multipliers || '{}');
-      const expenses = db.prepare(`
-        SELECT category, SUM(amount) as total
-        FROM expenses
-        WHERE user_id = ? AND payment_instrument_id = ? AND strftime('%Y-%m', date) = ?
-        GROUP BY category
-      `).all(userId, inst.id, currentMonth);
+    const instrumentSummaries = await Promise.all(instruments.map(async (inst) => {
+      const multipliers = inst.category_multipliers || {};
+      
+      const categoryExpenses = await Expense.aggregate([
+        { 
+          $match: { 
+            user_id: userId, 
+            payment_instrument_id: inst._id,
+            date: { $regex: new RegExp(`^${currentMonth}`) }
+          } 
+        },
+        { $group: { _id: "$category", total: { $sum: "$amount" } } }
+      ]);
 
       let rawRewards = 0;
-      expenses.forEach(exp => {
-        const mult = multipliers[exp.category] || 1;
+      categoryExpenses.forEach(exp => {
+        const mult = multipliers.get(exp._id) || 1;
         rawRewards += exp.total * (inst.base_reward_rate / 100) * mult;
       });
 
@@ -76,42 +102,30 @@ router.get('/summary', (req, res) => {
       const monetaryValue = rawRewards * inst.redemption_value;
       totalRewardsValue += monetaryValue;
 
-      // Milestone check
-      const totalForInst = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) as total
-        FROM expenses
-        WHERE user_id = ? AND payment_instrument_id = ?
-      `).get(userId, inst.id);
+      const totalForInst = await ExpenseRepository.sumAmountByInstrument(userId.toString(), inst._id);
 
       return {
-        id: inst.id,
+        id: inst._id,
         name: inst.name,
         color: inst.color,
         monthlyRewards: parseFloat(monetaryValue.toFixed(2)),
-        totalSpend: parseFloat(totalForInst.total.toFixed(2)),
+        totalSpend: parseFloat(totalForInst.toFixed(2)),
         milestoneThreshold: inst.milestone_threshold,
         milestoneBonus: inst.milestone_bonus,
         milestoneProgress: inst.milestone_threshold
-          ? Math.min((totalForInst.total / inst.milestone_threshold) * 100, 100)
+          ? Math.min((totalForInst / inst.milestone_threshold) * 100, 100)
           : null
       };
-    });
+    }));
 
     // Recent expenses
-    const recentExpenses = db.prepare(`
-      SELECT e.*, pi.name as instrument_name, pi.color as instrument_color
-      FROM expenses e
-      LEFT JOIN payment_instruments pi ON e.payment_instrument_id = pi.id
-      WHERE e.user_id = ?
-      ORDER BY e.date DESC, e.created_at DESC
-      LIMIT 10
-    `).all(userId);
+    const recentExpenses = await ExpenseRepository.findFiltered(userId.toString(), { limit: 10 });
 
     res.json({
       currentMonth,
-      monthTotal: parseFloat(monthTotal.total.toFixed(2)),
-      allTimeTotal: parseFloat(allTimeTotal.total.toFixed(2)),
-      instrumentCount: instrumentCount.count,
+      monthTotal: parseFloat(monthTotal.toFixed(2)),
+      allTimeTotal: parseFloat(allTimeTotal.toFixed(2)),
+      instrumentCount,
       totalRewardsValue: parseFloat(totalRewardsValue.toFixed(2)),
       monthlyTotals,
       categoryBreakdown,
@@ -123,5 +137,7 @@ router.get('/summary', (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+module.exports = router;
 
 module.exports = router;

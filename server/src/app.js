@@ -7,6 +7,7 @@ const expensesRoutes = require('./routes/expenses');
 const instrumentsRoutes = require('./routes/instruments');
 const analyticsRoutes = require('./routes/analytics');
 const recommendRoutes = require('./routes/recommend');
+const cardsRoutes = require('./routes/cards');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/expenses', expensesRoutes);
 app.use('/api/instruments', instrumentsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/recommend', recommendRoutes);
+app.use('/api/cards', cardsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

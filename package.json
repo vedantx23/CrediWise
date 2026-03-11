@@ -7,7 +7,8 @@
         "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
         "dev:server": "cd server && npm run dev",
         "dev:client": "cd client && npm run dev",
-        "install:all": "npm install && cd server && npm install && cd ../client && npm install"
+        "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+        "stop": "powershell \"Get-Process -Id (Get-NetTCPConnection -LocalPort 5000,5173 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force\""
     },
     "devDependencies": {
         "concurrently": "^8.2.2"

@@ -12,30 +12,25 @@
  * 8. Sort by monetary value (composite score)
  */
 
-const { getDb } = require('../db/database');
+const InstrumentRepository = require('../repositories/InstrumentRepository');
+const ExpenseRepository = require('../repositories/ExpenseRepository');
 
-function calculateRecommendations(userId, amount, category) {
-  const db = getDb();
-
-  const instruments = db.prepare(
-    'SELECT * FROM payment_instruments WHERE user_id = ? ORDER BY created_at ASC'
-  ).all(userId);
+async function calculateRecommendations(userId, amount, category) {
+  const instruments = await InstrumentRepository.findAllByUserId(userId);
 
   if (instruments.length === 0) {
     return { recommendations: [], message: 'No payment instruments found. Add a card first.' };
   }
 
-  const results = instruments.map(inst => {
-    const multipliers = JSON.parse(inst.category_multipliers || '{}');
+  const results = await Promise.all(instruments.map(async (inst) => {
+    const multipliers = inst.category_multipliers || {};
     const categoryMult = multipliers[category] || 1;
 
     // Raw rewards for this transaction
     let rawRewards = amount * (inst.base_reward_rate / 100) * categoryMult;
 
     // Get cumulative spend on this instrument (all time)
-    const cumulativeSpend = db.prepare(
-      'SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE user_id = ? AND payment_instrument_id = ?'
-    ).get(userId, inst.id).total;
+    const cumulativeSpend = await ExpenseRepository.sumAmountByInstrument(userId, inst.id);
 
     const newCumulativeSpend = cumulativeSpend + amount;
 
@@ -156,7 +151,7 @@ function calculateRecommendations(userId, amount, category) {
       milestoneProgress,
       explanation
     };
-  });
+  }));
 
   // Sort by composite score descending
   results.sort((a, b) => b.compositeScore - a.compositeScore);
@@ -168,5 +163,7 @@ function calculateRecommendations(userId, amount, category) {
 
   return { recommendations: results };
 }
+
+module.exports = { calculateRecommendations };
 
 module.exports = { calculateRecommendations };
