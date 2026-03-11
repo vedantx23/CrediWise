@@ -4,22 +4,50 @@ import toast from 'react-hot-toast';
 import './Instruments.css';
 
 export default function Instruments() {
-  const { userCards, availableCards, addUserCard, removeUserCard } = useCardContext();
+  const { userCards, availableCards, addUserCard, removeUserCard, loading } = useCardContext();
   const [showModal, setShowModal] = useState(false);
   const [selectedCardName, setSelectedCardName] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleAddCard = (e) => {
+  const handleAddCard = async (e) => {
     e.preventDefault();
     const cardToAdd = availableCards.find(c => c.Card_Name === selectedCardName);
     if (cardToAdd) {
-      addUserCard(cardToAdd);
-      toast.success(`${cardToAdd.Card_Name} added successfully!`);
-      setShowModal(false);
-      setSelectedCardName('');
+      setSaving(true);
+      try {
+        await addUserCard(cardToAdd);
+        toast.success(`${cardToAdd.Card_Name} added successfully!`);
+        setShowModal(false);
+        setSelectedCardName('');
+      } catch (err) {
+        toast.error('Failed to add card. Please try again.');
+      } finally {
+        setSaving(false);
+      }
     } else {
       toast.error('Please select a valid card');
     }
   };
+
+  const handleRemoveCard = async (card) => {
+    if (!confirm(`Remove ${card.Card_Name}?`)) return;
+    try {
+      await removeUserCard(card.Card_Name);
+      toast.success('Card removed');
+    } catch (err) {
+      toast.error('Failed to remove card. Please try again.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="page-body">
+        <div className="empty-state" style={{ marginTop: 80 }}>
+          <div className="empty-title">Loading your cards...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-body">
@@ -56,7 +84,7 @@ export default function Instruments() {
               </thead>
               <tbody>
                 {userCards.map((card, idx) => (
-                  <tr key={idx}>
+                  <tr key={card._instrumentId || idx}>
                     <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{card.Card_Name}</td>
                     <td>
                       <span className={`badge badge-${card.Bank === 'HDFC' ? 'blue' : card.Bank === 'Axis' ? 'red' : card.Bank === 'SBI' ? 'green' : 'gray'}`}>
@@ -71,12 +99,7 @@ export default function Instruments() {
                     <td>
                       <button 
                         className="btn btn-danger btn-sm" 
-                        onClick={() => {
-                          if(confirm(`Remove ${card.Card_Name}?`)) {
-                            removeUserCard(card.Card_Name);
-                            toast.success('Card removed');
-                          }
-                        }}
+                        onClick={() => handleRemoveCard(card)}
                       >
                         Remove
                       </button>
@@ -105,6 +128,7 @@ export default function Instruments() {
                   value={selectedCardName} 
                   onChange={e => setSelectedCardName(e.target.value)}
                   required
+                  disabled={saving}
                 >
                   <option value="">Choose a card...</option>
                   {availableCards.map(card => (
@@ -116,8 +140,10 @@ export default function Instruments() {
               </div>
 
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add Card</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Adding...' : 'Add Card'}
+                </button>
               </div>
             </form>
           </div>
