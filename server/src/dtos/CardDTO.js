@@ -3,15 +3,16 @@ class CardDTO {
     this.id = card._id;
     this.name = card.name;
     this.bank = card.bank;
-    this.type = card.type;
-    this.network = card.network;
-    this.base_reward_rate = card.base_reward_rate;
-    this.redemption_value = card.redemption_value;
-    this.category_multipliers = card.category_multipliers ? 
-      (card.category_multipliers instanceof Map ? Object.fromEntries(card.category_multipliers) : card.category_multipliers) : {};
-    this.annual_fee = card.annual_fee;
-    this.benefits = card.benefits || [];
-    this.image_url = card.image_url;
+    this.min_income_lpa = card.min_income_lpa;
+    this.annual_fee_inr = card.annual_fee_inr;
+    this.reward_rate = card.reward_rate;
+    this.reward_type = card.reward_type;
+    this.reward_value_per_point_inr = card.reward_value_per_point_inr;
+    this.lounge_access = card.lounge_access;
+    this.international_usage = card.international_usage;
+    this.milestone_reward = card.milestone_reward;
+    this.spend_based_fee_waiver = card.spend_based_fee_waiver;
+    this.third_party_tieups = card.third_party_tieups || [];
   }
 }
 

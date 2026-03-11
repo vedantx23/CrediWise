@@ -17,66 +17,45 @@ async function connectDb() {
 
 async function seedCardDirectory() {
     const Card = require('../models/Card');
-    const cards = [
-        {
-            name: 'HDFC Bank Regalia Gold',
-            bank: 'HDFC Bank',
-            type: 'credit',
-            network: 'Visa/Mastercard',
-            base_reward_rate: 1.33,
-            redemption_value: 0.5,
-            category_multipliers: { 'Travel': 5, 'Dining': 5 },
-            benefits: ['Lounge Access', 'Priority Pass', 'Insurance Cover']
-        },
-        {
-            name: 'Amazon Pay ICICI Bank Credit Card',
-            bank: 'ICICI Bank',
-            type: 'credit',
-            network: 'Visa',
-            base_reward_rate: 1.0,
-            redemption_value: 1.0,
-            category_multipliers: { 'Shopping': 5, 'Utilities': 2 },
-            benefits: ['Unlimited 5% back on Amazon for Prime members', 'No Joining Fee']
-        },
-        {
-            name: 'SBI Card ELITE',
-            bank: 'SBI Card',
-            type: 'credit',
-            network: 'Visa/Mastercard',
-            base_reward_rate: 0.5,
-            redemption_value: 0.25,
-            category_multipliers: { 'Dining': 5, 'Departmental Stores': 5, 'Grocery': 5 },
-            benefits: ['Movie Tickets', 'Lounge Access', 'Milestone Rewards']
-        },
-        {
-            name: 'Axis Bank Ace Credit Card',
-            bank: 'Axis Bank',
-            type: 'credit',
-            network: 'Visa',
-            base_reward_rate: 2.0,
-            redemption_value: 1.0,
-            category_multipliers: { 'Utilities': 5, 'Food Delivery': 4 },
-            benefits: ['Flat 2% Cashback', 'Lounge Access']
-        },
-        {
-            name: 'ICICI Bank Coral Contactless Card',
-            bank: 'ICICI Bank',
-            type: 'credit',
-            network: 'Visa/Mastercard',
-            base_reward_rate: 0.5,
-            redemption_value: 0.25,
-            category_multipliers: { 'Dining': 2 },
-            benefits: ['Movie Discounts', 'Lounge Access']
-        }
+    const rawData = [
+        ["HDFC Regalia Gold Credit Card","HDFC",18,2500,"4 points per ₹150","Reward Points",0.50,"Domestic + International","Yes","Bonus points on yearly spend","Fee waived on ₹4L annual spend","SmartBuy; Vistara; MakeMyTrip; Myntra"],
+        ["HDFC Infinia Credit Card","HDFC",40,12500,"5 points per ₹150","Reward Points",1.00,"Unlimited Domestic + International","Yes","High spend milestone vouchers","Fee waived on ₹10L annual spend","Marriott Bonvoy; SmartBuy; Tata Cliq"],
+        ["HDFC Diners Club Black Credit Card","HDFC",21,10000,"5 points per ₹150","Reward Points",0.80,"Unlimited Domestic + International","Yes","Bonus reward points at milestones","Fee waived on ₹5L annual spend","SmartBuy; Marriott; Airline Partners"],
+        ["HDFC Millennia Credit Card","HDFC",6,1000,"5% on select partners","Cashback",1.00,"Limited Domestic","Yes","Quarterly cashback milestones","Fee waived on ₹1L annual spend","Amazon; Flipkart; Paytm"],
+        ["Axis Magnus Credit Card","Axis",24,12500,"12 points per ₹200","Reward Points",0.80,"Unlimited Domestic + International","Yes","Travel vouchers on milestones","Fee waived on ₹25L annual spend","Airline Partners; Hotel Partners"],
+        ["Axis Atlas Credit Card","Axis",12,5000,"2–5 miles per ₹100","Air Miles",1.00,"Domestic + International","Yes","Bonus EDGE miles","Fee waived on ₹7.5L annual spend","Marriott Bonvoy; Accor; Airline Programs"],
+        ["Axis Select Credit Card","Axis",10,3000,"10 points per ₹200","Reward Points",0.40,"Domestic + International","Yes","Dining vouchers","Fee waived on ₹3L annual spend","Swiggy; Zomato; BigBasket"],
+        ["Flipkart Axis Bank Credit Card","Axis",3,500,"5% Flipkart","Cashback",1.00,"Domestic + International","No","Occasional cashback offers","Fee waived on ₹2L annual spend","Flipkart; Myntra"],
+        ["SBI Cashback Credit Card","SBI",3,999,"5% online spending","Cashback",1.00,"No lounge","Yes","Extra cashback campaigns","Fee waived on ₹2L annual spend","Amazon; Myntra; Online Merchants"],
+        ["SBI Card Prime","SBI",8,2999,"2 points per ₹100","Reward Points",0.25,"Domestic + International","Yes","Welcome vouchers","Fee waived on ₹3L annual spend","Club Vistara; Yatra; Trident Hotels"],
+        ["SBI Card Elite","SBI",15,4999,"2 points per ₹100","Reward Points",0.25,"Domestic + International","Yes","Luxury brand vouchers","Fee waived on ₹10L annual spend","Taj Hotels; BookMyShow"],
+        ["Flipkart SBI Credit Card","SBI",3,500,"5% Flipkart","Cashback",1.00,"No lounge","Yes","Occasional cashback offers","Fee waived on ₹1L annual spend","Flipkart"],
+        ["Amazon Pay ICICI Credit Card","ICICI",3,0,"5% Amazon Prime","Cashback",1.00,"No lounge","Yes","Amazon sale cashback","No fee (lifetime free)","Amazon"],
+        ["ICICI Coral Credit Card","ICICI",4,500,"2 points per ₹100","Reward Points",0.25,"Domestic","Yes","Movie ticket offers","Fee waived on ₹1.5L annual spend","BookMyShow; Dining Partners"],
+        ["ICICI Rubyx Credit Card","ICICI",10,3000,"2 points per ₹100","Reward Points",0.25,"Domestic + International","Yes","Milestone reward points","Fee waived on ₹3L annual spend","BookMyShow; Airlines"],
+        ["ICICI Sapphiro Credit Card","ICICI",15,6500,"2 points per ₹100","Reward Points",0.25,"Domestic + International","Yes","Travel vouchers","Fee waived on ₹6L annual spend","EaseMyTrip; Tata Cliq"]
     ];
 
+    const cards = rawData.map(c => ({
+        name: c[0],
+        bank: c[1],
+        min_income_lpa: c[2],
+        annual_fee_inr: c[3],
+        reward_rate: c[4],
+        reward_type: c[5],
+        reward_value_per_point_inr: c[6],
+        lounge_access: c[7],
+        international_usage: c[8],
+        milestone_reward: c[9],
+        spend_based_fee_waiver: c[10],
+        third_party_tieups: c[11].split(';').map(s => s.trim())
+    }));
+
     try {
-        const count = await Card.countDocuments();
-        if (count === 0) {
-            console.log('🌱 Seeding card directory...');
-            await Card.insertMany(cards);
-            console.log('✅ Card directory seeded with 5 cards');
-        }
+        console.log('🌱 Refreshing card directory...');
+        await Card.deleteMany({});
+        await Card.insertMany(cards);
+        console.log(`✅ Card directory seeded with ${cards.length} cards`);
     } catch (err) {
         console.error('❌ Error seeding card directory:', err);
     }
