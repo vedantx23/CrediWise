@@ -1,0 +1,29 @@
+{
+  "regression": {
+    "rmse": 911.4986229402057,
+    "mae": 497.06864429243967,
+    "r2": 0.9994382754546429
+  },
+  "ranking": {
+    "ndcg_at_3": 0.9901108775139053,
+    "precision_at_3": 0.9733333333333334
+  },
+  "model_selection": {
+    "model_name": "extra",
+    "n_estimators": 252,
+    "max_depth": 14,
+    "min_samples_leaf": 1
+  },
+  "card_segments": {
+    "0": "Entry_Level",
+    "3": "Mid_Tier",
+    "1": "Premium",
+    "2": "Super_Premium"
+  },
+  "user_clusters": {
+    "0": "Minimal Fee Users",
+    "1": "Cashback Maximizers",
+    "2": "Lifestyle Users",
+    "3": "Travel Optimizers"
+  }
+}
