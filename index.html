@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Share+Tech+Mono&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   
   <style>
     /* =========================================================
@@ -274,10 +275,51 @@
     .c-head h3 { font-family: 'Syncopate'; font-size: 14px; letter-spacing: 0.1em; }
     .c-close { background: transparent; border: none; color: #fff; font-size: 20px; cursor: pointer; }
     
-    .c-body { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-    .msg { padding: 12px 16px; border-radius: 12px; font-size: 13.5px; line-height: 1.5; max-width: 90%; }
-    .msg.bot { background: rgba(255,255,255,0.05); align-self: flex-start; font-family: 'Inter'; border: 1px solid var(--border-metallic); border-bottom-left-radius: 4px; }
-    .msg.user { background: var(--accent-platinum); color: #000; font-weight: 500; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .c-body { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; scroll-behavior: smooth; }
+    .msg { 
+      padding: 16px 20px; border-radius: 12px; font-size: 14.5px; line-height: 1.6; max-width: 95%; 
+      animation: msgFadeIn 0.4s var(--ease-smooth) both;
+    }
+    @keyframes msgFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .msg.bot { 
+      background: rgba(255,255,255,0.03); align-self: flex-start; 
+      font-family: 'Inter'; border: 1px solid var(--border-metallic); 
+      border-bottom-left-radius: 4px; 
+      color: #e2e8f0;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .msg.bot hr { 
+      border: none; border-top: 1px solid var(--border-metallic); 
+      margin: 15px 0; opacity: 0.5;
+    }
+    .msg.bot ul, .msg.bot ol { 
+      margin-left: 20px; margin-bottom: 15px; list-style-type: none;
+    }
+    .msg.bot li { 
+      margin-bottom: 8px; position: relative;
+    }
+    .msg.bot li::before {
+      content: "•"; color: var(--highlight); position: absolute; left: -15px; font-weight: bold;
+    }
+    .msg.bot p { margin-bottom: 15px; }
+    .msg.bot h3 { 
+      font-size: 18px; margin: 30px 0 15px; 
+      color: #fff; font-family: 'Syncopate'; letter-spacing: 0.1em;
+      text-transform: uppercase; border-left: 5px solid var(--highlight);
+      padding-left: 15px;
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.1), transparent);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .msg.bot strong { 
+      color: var(--highlight); font-weight: 800; font-size: 1.05em;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .msg.user { 
+      background: var(--accent-platinum); color: #000; font-weight: 600; 
+      align-self: flex-end; border-bottom-right-radius: 2px;
+      box-shadow: 0 4px 15px rgba(255,255,255,0.1);
+    }
     
     .c-foot { padding: 20px; border-top: 1px solid var(--border-metallic); display: flex; gap: 10px; background: rgba(0,0,0,0.5); }
     .c-foot input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid var(--border-metallic); border-radius: 8px; padding: 0 16px; color: #fff; font-family: 'Inter'; font-size: 14px; outline: none;}
@@ -552,17 +594,43 @@ function toggleO() {
 }
 function addMsg(role, tx) {
   const b = document.getElementById('o-chat');
-  b.insertAdjacentHTML('beforeend', `<div class="msg ${role}">${tx}</div>`);
+  let content = tx;
+  if (role === 'bot') {
+    if (window.marked && typeof marked.parse === 'function') {
+      content = marked.parse(tx);
+    } else {
+      // Emergency Fallback Parser if CDN fails
+      content = tx
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>')
+        .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+        .replace(/---/gim, '<hr>')
+        .replace(/\n\n/gim, '<p></p>');
+    }
+  }
+  b.insertAdjacentHTML('beforeend', `<div class="msg ${role}">${content}</div>`);
   b.scrollTop = b.scrollHeight;
+}
+function addBotLoading() {
+  const b = document.getElementById('o-chat');
+  const id = 'loader-' + Date.now();
+  b.insertAdjacentHTML('beforeend', `<div class="msg bot" id="${id}"><span class="loading-dots">Thinking...</span></div>`);
+  b.scrollTop = b.scrollHeight;
+  return id;
 }
 async function askO() {
   const inp = document.getElementById('o-input'); const q = inp.value.trim(); if(!q) return;
   inp.value = ''; addMsg('user', q);
+  const loaderId = addBotLoading();
   try {
     const r = await fetch('/api/query', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q, history: hst, recommended_cards: currentCardsContext }) });
-    const d = await r.json(); addMsg('bot', d.answer || '...');
+    const d = await r.json(); 
+    document.getElementById(loaderId).remove();
+    addMsg('bot', d.answer || '...');
     hst.push({role:'user',content:q}, {role:'assistant',content:d.answer});
-  } catch { addMsg('bot', 'Amnesia Protocol: Server is offline.'); }
+  } catch { 
+    document.getElementById(loaderId).innerText = 'Amnesia Protocol: Server is offline.';
+  }
 }
 document.getElementById('o-input').addEventListener('keypress', e => e.key==='Enter' && askO());
 
