@@ -19,6 +19,33 @@ class RecommendationArtifacts:
     user_cluster_model: object
     user_cluster_labels: Dict[int, str]
 
+ARCHETYPE_MAP = {
+    "Travel Optimizers": {
+        "name": "THE STEALTH NOMAD",
+        "color": "#38bdf8",
+        "icon": "✈️",
+        "desc": "You prioritize global mobility and lounge luxury over raw cashback."
+    },
+    "Lifestyle Users": {
+        "name": "THE HIGH-STREET ARCHITECT",
+        "color": "#fb7185",
+        "icon": "🛍️",
+        "desc": "Your spending is a curated mix of dining and premium retail experiences."
+    },
+    "Cashback Maximizers": {
+        "name": "THE REWARD ARBITRAGEUR",
+        "color": "#34d399",
+        "icon": "📈",
+        "desc": "You treat points like a secondary currency, looking for the highest yield per rupee."
+    },
+    "Minimal Fee Users": {
+        "name": "THE FRUGAL ZEN MASTER",
+        "color": "#94a3b8",
+        "icon": "🧘",
+        "desc": "Efficiency is your mantra. You avoid annual fees like the plague."
+    }
+}
+
 
 def load_artifacts(models_dir: str = "models", dataset_path: str = "credit_card_dataset_master.csv") -> RecommendationArtifacts:
     return RecommendationArtifacts(
@@ -309,6 +336,12 @@ def recommend_cards(artifacts: RecommendationArtifacts, user_profile: Dict, top_
     cards = artifacts.cards.copy()
     weights = _ahp_weights(user_profile)
     profile_label = _cluster_label(artifacts, user_profile)
+    archetype = ARCHETYPE_MAP.get(profile_label, {
+        "name": "THE UNDEFINED DATASET",
+        "color": "#fff",
+        "icon": "❔",
+        "desc": "Your spending pattern is unique and defies standard classification."
+    })
 
     candidates = cards[cards["Min_Income_LPA"] <= user_profile["Income"]].copy()
     if candidates.empty:
@@ -343,11 +376,29 @@ def recommend_cards(artifacts: RecommendationArtifacts, user_profile: Dict, top_
     )
 
     ranked = model_frame.sort_values("final_score", ascending=False).copy()
+    
+    # SHADOW AUDIT LOGIC
+    shadow_audit = None
     if owned_cards:
         owned_lower = [c.lower() for c in owned_cards]
-        filtered_ranked = ranked[ranked["Card_Name"].str.lower().apply(lambda x: any(o in x for o in owned_lower))]
-        if not filtered_ranked.empty:
-            ranked = filtered_ranked
+        # Find best owned card value
+        # We need to score ALL cards first to find the value of the owned one
+        owned_matches = model_frame[model_frame["Card_Name"].str.lower().apply(lambda x: any(o in x for o in owned_lower))]
+        if not owned_matches.empty:
+            best_owned_nav = owned_matches["ml_predicted_nav"].max()
+            best_recommended_nav = model_frame["ml_predicted_nav"].max()
+            leakage = best_recommended_nav - best_owned_nav
+            
+            status = "PASS"
+            if leakage > 15000: status = "CRITICAL"
+            elif leakage > 5000: status = "WARNING"
+            
+            shadow_audit = {
+                "current_best_nav": round(float(best_owned_nav), 2),
+                "potential_nav": round(float(best_recommended_nav), 2),
+                "reward_leakage": round(float(max(leakage, 0)), 2),
+                "status": status
+            }
 
     top_indices = []
     seen_families = set()
@@ -427,6 +478,8 @@ def recommend_cards(artifacts: RecommendationArtifacts, user_profile: Dict, top_
 
     return {
         "user_segment": profile_label,
+        "archetype": archetype,
+        "shadow_audit": shadow_audit,
         "ahp_weights": weights,
         "results": results,
         "portfolio_optimization": portfolio

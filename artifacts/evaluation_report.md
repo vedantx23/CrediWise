@@ -1,11 +1,11 @@
 # CrediWise Evaluation Report
 
-- Regression RMSE: 911.50
-- Regression MAE: 497.07
-- Regression R2: 0.9994
-- Ranking NDCG@3: 0.9901
-- Ranking Precision@3: 0.9733
-- Best model: extra
+- Regression RMSE: 11971.33
+- Regression MAE: 2626.81
+- Regression R2: 1.0000
+- Ranking NDCG@3: 0.9987
+- Ranking Precision@3: 0.9893
+- Best model: rf
 
 Generated artifacts:
 - `credit_card_dataset_cleaned.csv`

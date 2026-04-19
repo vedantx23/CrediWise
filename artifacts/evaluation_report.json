@@ -1,17 +1,17 @@
 {
   "regression": {
-    "rmse": 911.4986229402057,
-    "mae": 497.06864429243967,
-    "r2": 0.9994382754546429
+    "rmse": 11971.331224897356,
+    "mae": 2626.8120834278043,
+    "r2": 0.9999514818343702
   },
   "ranking": {
-    "ndcg_at_3": 0.9901108775139053,
-    "precision_at_3": 0.9733333333333334
+    "ndcg_at_3": 0.9987024430281013,
+    "precision_at_3": 0.9893333333333334
   },
   "model_selection": {
-    "model_name": "extra",
-    "n_estimators": 252,
-    "max_depth": 14,
+    "model_name": "rf",
+    "n_estimators": 178,
+    "max_depth": 15,
     "min_samples_leaf": 1
   },
   "card_segments": {

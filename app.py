@@ -17,7 +17,9 @@ try:
     ARTIFACTS = load_artifacts()
     ARTIFACTS_OK = True
     DB = pd.read_csv("credit_card_dataset_master.csv")
-except Exception:
+except Exception as e:
+    import traceback
+    traceback.print_exc()
     ARTIFACTS = None
     ARTIFACTS_OK = False
     DB = None
@@ -43,6 +45,15 @@ ADVISOR_SYSTEM_PROMPT = """You are the CrediWise Card Architect. Your mission is
 - **Tone**: Authoritative and data-driven.
 - **Visuals**: Use relevant emojis (✈️, 🛍️, 🏦).
 - **Numbers**: Use INR (₹) and exact percentages."""
+
+BOARDROOM_PROMPT = """### 🏛️ THE BOARDROOM PROTOCOL:
+You are now three distinct financial agents in a boardroom debate. Format your response as a transcript of their discussion.
+
+1. **MAX (The Spreadsheet)**: Aggressive, focused purely on ROI and math. He hates annual fees unless they yield 10x value.
+2. **SAGE (The Traveler)**: Sophisticated, focused on lounge access, insurance, and international perks. ROI is secondary to experience.
+3. **MINT (The Minimalist)**: Practical, hates managing multiple cards. Wants one 'Everything Card' with zero friction.
+
+Each agent should state their case briefly, argue with each other, and then provide a unified 'Final Verdict' block at the end."""
 
 
 class UserProfileVector(BaseModel):
@@ -109,6 +120,8 @@ class QueryRequest(BaseModel):
     question: str
     history: List[Dict] = []
     recommended_cards: List[str] = []
+    boardroom_mode: bool = False
+    archetype: Optional[str] = None
 
 
 @app.post("/api/query")
@@ -128,6 +141,12 @@ def ai_query(req: QueryRequest):
                 rag_context += f"- {m['Card_Name']}: Annual Fee {m['Annual_Fee_INR']} INR. Type: {m.get('Reward_Type', 'N/A')}. Domestic Lounge: {m.get('Lounge_Domestic', 0)}.\n"
 
     context = ADVISOR_SYSTEM_PROMPT
+    if req.boardroom_mode:
+        context += f"\n\n{BOARDROOM_PROMPT}"
+    
+    if req.archetype:
+        context += f"\n\nUSER'S FINANCIAL ARCHETYPE: {req.archetype}"
+        
     if req.recommended_cards:
         context += f"\n\nUSER'S TOP RECOMMENDED CARDS: {', '.join(req.recommended_cards)}"
     if rag_context:

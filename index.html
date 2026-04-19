@@ -27,6 +27,13 @@
       
       --ease-elastic: cubic-bezier(0.175, 0.885, 0.32, 1.275);
       --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
+      
+      /* Archetype Tokens */
+      --theme-nomad: linear-gradient(135deg, #0ea5e9, #22d3ee);
+      --theme-architect: linear-gradient(135deg, #e11d48, #fb7185);
+      --theme-arbitrageur: linear-gradient(135deg, #059669, #34d399);
+      --theme-zen: linear-gradient(135deg, #475569, #94a3b8);
+      --theme-leakage: #f43f5e;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -335,6 +342,49 @@
     }
     .fab:hover { transform: scale(1.1); box-shadow: 0 15px 30px rgba(255,255,255,0.2); }
 
+    /* NEW SELLING POINT: AUDIT WIDGET */
+    .audit-banner {
+      width: 100%; margin-bottom: 30px; padding: 24px; border-radius: 16px;
+      display: none; align-items: center; gap: 20px;
+      background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.3);
+      animation: slideIn 0.6s var(--ease-smooth);
+    }
+    .audit-banner.critical { background: rgba(244, 63, 94, 0.2); border-color: var(--theme-leakage); box-shadow: 0 0 20px rgba(244, 63, 94, 0.2); }
+    .audit-banner.pass { background: rgba(16, 185, 129, 0.1); border-color: #10b981; }
+    
+    .audit-icon { font-size: 32px; }
+    .audit-details h4 { font-family: 'Syncopate'; font-size: 14px; margin-bottom: 4px; }
+    .audit-details p { font-size: 13px; color: var(--text-muted); }
+    .leakage-val { font-family: 'Share Tech Mono'; font-size: 24px; color: var(--theme-leakage); font-weight: 700; }
+    .pass .leakage-val { color: #10b981; }
+
+    /* SCANNING MODAL */
+    #persona-modal {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(10, 10, 12, 0.98);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      transition: 0.5s opacity;
+    }
+    .scan-line {
+      width: 400px; height: 2px; background: #fff; box-shadow: 0 0 20px #fff;
+      position: absolute; top: 0; animation: scanAnim 3s linear infinite;
+    }
+    @keyframes scanAnim { 0% { top: 20%; opacity: 0; } 50% { opacity: 1; } 100% { top: 80%; opacity: 0; } }
+    .archetype-reveal { text-align: center; opacity: 0; transform: scale(0.8); }
+    .archetype-reveal.show { animation: zoomIn 0.8s var(--ease-elastic) forwards; }
+    @keyframes zoomIn { to { opacity: 1; transform: scale(1); } }
+    .arch-name { font-family: 'Syncopate'; font-size: 42px; margin: 20px 0; background: var(--theme-nomad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    /* Boardroom Toggle */
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 8px; }
+    .toggle-row span { font-size: 11px; font-family: 'Syncopate'; letter-spacing: 0.1em; color: var(--text-muted); }
+    .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 20px; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--highlight); }
+    input:checked + .slider:before { transform: translateX(20px); }
+
   </style>
 </head>
 <body>
@@ -427,14 +477,31 @@
 
 </main>
 
+<!-- Archetype Reveal Modal -->
+<div id="persona-modal">
+  <div class="scan-line"></div>
+  <div class="archetype-reveal" id="arch-reveal">
+    <div id="arch-icon" style="font-size: 64px;"></div>
+    <div class="arch-name" id="arch-name">THE STEALTH NOMAD</div>
+    <p id="arch-desc" style="max-width: 500px; color: var(--text-muted); font-size: 14px; line-height: 1.6;"></p>
+    <div style="margin-top: 40px; font-family: 'Share Tech Mono'; color: var(--highlight); font-size: 12px; letter-spacing: 2px;">CALCULATING REWARD LEAKAGE...</div>
+  </div>
+</div>
+
 <button class="fab" onclick="toggleO()">💬</button>
 <div class="chat-drawer" id="o-ui">
   <div class="c-head">
     <h3>ORACLE ASSISTANT</h3>
     <button class="c-close" onclick="toggleO()">✕</button>
   </div>
-  <div class="c-body" id="o-chat">
-    <div class="msg bot">I am the AI Oracle. I have successfully established a secure link to the dataset. What do you wish to know about Indian credit cards?</div>
+  <div class="c-body">
+    <div class="toggle-row">
+      <span>🏛️ BOARDROOM MODE</span>
+      <label class="switch"><input type="checkbox" id="boardroom-toggle"><span class="slider"></span></label>
+    </div>
+    <div id="o-chat" style="display:flex; flex-direction:column; gap:24px;">
+      <div class="msg bot">I am the AI Oracle. I have successfully established a secure link to the dataset. What do you wish to know about Indian credit cards?</div>
+    </div>
   </div>
   <div class="c-foot">
     <input type="text" id="o-input" placeholder="Initiate query..." autocomplete="off">
@@ -489,11 +556,8 @@ ping();
 
 async function executeSynthesis() {
   const btn = document.querySelector('.cta-btn');
-  btn.textContent = "PROCESSING..."; btn.style.pointerEvents = "none";
-  document.getElementById('v-blank').style.display = 'none';
-  const vOut = document.getElementById('v-out');
-  vOut.innerHTML = '';
-
+  btn.textContent = "SYNTHESIZING..."; btn.style.pointerEvents = "none";
+  
   const payload = {
     Income: parseFloat(document.getElementById('income').value)||12,
     Monthly_Spend: parseFloat(document.getElementById('monthly_spend').value)||0,
@@ -513,12 +577,56 @@ async function executeSynthesis() {
     const res = await fetch('/recommend', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
     const data = await res.json();
     
-    btn.textContent = "PROCESS APPLICATION"; btn.style.pointerEvents = "all";
+    if(!res.ok) { 
+        btn.textContent = "PROCESS APPLICATION"; btn.style.pointerEvents = "all";
+        alert(`Core Failure: ${data.detail}`); return; 
+    }
 
-    if(!res.ok) { vOut.innerHTML = `<div style="color:#ef4444">Processing Error: ${data.detail}</div>`; return; }
+    // TRIGGER ARCHETYPE REVEAL
+    const modal = document.getElementById('persona-modal');
+    const reveal = document.getElementById('arch-reveal');
+    modal.style.display = 'flex';
+    document.getElementById('arch-name').innerText = data.archetype.name;
+    document.getElementById('arch-name').style.background = data.archetype.color;
+    document.getElementById('arch-name').style.webkitBackgroundClip = 'text';
+    document.getElementById('arch-icon').innerText = data.archetype.icon;
+    document.getElementById('arch-desc').innerText = data.archetype.desc;
+    
+    setTimeout(() => { reveal.classList.add('show'); }, 100);
+
+    // Wait 3 seconds for drama
+    await new Promise(r => setTimeout(r, 3000));
+    modal.style.opacity = '0';
+    setTimeout(() => { modal.style.display = 'none'; modal.style.opacity = '1'; reveal.classList.remove('show'); }, 500);
 
     currentCardsContext = data.results.map(c => `${c.bank_name} ${c.card}`);
-    let html = `<div class="section-title" style="margin-bottom:30px;">PROFILE ASSIGNMENT: ${data.user_segment}</div>`;
+    document.getElementById('v-blank').style.display = 'none';
+    const vOut = document.getElementById('v-out');
+    vOut.innerHTML = '';
+    
+    btn.textContent = "PROCESS APPLICATION"; btn.style.pointerEvents = "all";
+
+    let html = '';
+    
+    // SHADOW AUDIT BANNER
+    if(data.shadow_audit) {
+        const s = data.shadow_audit;
+        const isCritical = s.status === 'CRITICAL';
+        html += `
+        <div class="audit-banner ${isCritical ? 'critical' : 'pass'}" style="display:flex">
+            <div class="audit-icon">${isCritical ? '⚠️' : '✅'}</div>
+            <div class="audit-details">
+                <h4>SHADOW AUDIT: ${isCritical ? 'REWARD LEAKAGE DETECTED' : 'EFFICIENT PORTFOLIO'}</h4>
+                <p>${isCritical ? 'Your current cards are underperforming by a massive margin.' : 'You are currently utilizing your spend with high efficiency.'}</p>
+            </div>
+            <div style="margin-left:auto; text-align:right">
+                <div class="leakage-val">-${formatINR(s.reward_leakage)}</div>
+                <div style="font-size:10px; color:var(--text-muted)">LOST PER YEAR</div>
+            </div>
+        </div>`;
+    }
+
+    html += `<div class="section-title" style="margin-bottom:30px;">PROFILE ASSIGNMENT: ${data.archetype.name}</div>`;
 
     data.results.forEach((c, i) => {
       let themeClass = "theme-core";
@@ -526,9 +634,6 @@ async function executeSynthesis() {
       if(c.card_segment.toLowerCase().includes('super')) themeClass = "theme-super_premium";
       
       const isFee = c.annual_fee_inr > 0;
-      const isPos = c.expected_net_annual_value > 0;
-
-      // Random-looking mock numbers
       const p1 = Math.floor(4000 + Math.random()*1000); const p2 = Math.floor(1000 + Math.random()*9000);
 
       html += `
@@ -541,40 +646,21 @@ async function executeSynthesis() {
               <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.8 14.8c-.2.2-.5.2-.7 0-.2-.2-.2-.5 0-.7 1.5-1.5 1.5-4 0-5.5-.2-.2-.2-.5 0-.7s.5-.2.7 0c1.9 1.9 1.9 5 0 6.9zM12 18.5c-.2 0-.5-.1-.7-.3-2.3-2.3-2.3-6.1 0-8.4.2-.2.5-.2.7 0s.2.5 0 .7c-2 2-2 5.3 0 7.3.2.2.2.5 0 .7-.2.2-.4.3-.7.3zM14.5 21v-1.5c2.6-1.1 4.5-3.6 4.5-6.5S17.1 7.6 14.5 6.5V5c3.4 1.1 6 4.3 6 8s-2.6 6.9-6 8z"/></svg>
             </div>
           </div>
-          
-          <div class="cc-mid">
-            <div class="cc-chip"></div>
-            <div class="cc-name">${c.card.toUpperCase()}</div>
-          </div>
-          
+          <div class="cc-mid"><div class="cc-chip"></div><div class="cc-name">${c.card.toUpperCase()}</div></div>
           <div class="cc-bot">
             <div class="cc-number">${p1} ${p2} •••• ••••</div>
-            <div class="cc-details">
-              <div class="cc-valid">VALID THRU 12/30</div>
-              <div class="cc-rank">RANK 0${i+1}</div>
-            </div>
+            <div class="cc-details"><div class="cc-valid">VALID THRU 12/30</div><div class="cc-rank">RANK 0${i+1}</div></div>
           </div>
         </div>
-
         <div class="analysis-panel" style="display:block;">
           <div class="metrics-row">
-            <div class="m-item">
-              <div class="m-lbl">Projected Return</div>
-              <div class="m-val m-pos">${formatINR(c.expected_net_annual_value)}</div>
-            </div>
-            <div class="m-item">
-              <div class="m-lbl">Annual Fee</div>
-              <div class="m-val ${isFee?'m-fee':''}">${formatINR(c.annual_fee_inr)}</div>
-            </div>
-            <div class="m-item">
-              <div class="m-lbl">Engine Confidence</div>
-              <div class="m-val" style="color:var(--highlight)">${(c.confidence_score*100).toFixed(1)}%</div>
-            </div>
+            <div class="m-item"><div class="m-lbl">Projected Return</div><div class="m-val m-pos">${formatINR(c.expected_net_annual_value)}</div></div>
+            <div class="m-item"><div class="m-lbl">Annual Fee</div><div class="m-val ${isFee?'m-fee':''}">${formatINR(c.annual_fee_inr)}</div></div>
+            <div class="m-item"><div class="m-lbl">Confidence</div><div class="m-val" style="color:var(--highlight)">${(c.confidence_score*100).toFixed(1)}%</div></div>
           </div>
           <div class="shap-expl">${c.reason_selected ? c.reason_selected.map(r => '• ' + r).join('<br>') : ''}</div>
         </div>
-      </div>
-      `;
+      </div>`;
     });
 
     vOut.innerHTML = html;
@@ -582,7 +668,7 @@ async function executeSynthesis() {
 
   } catch(e) {
     btn.textContent = "PROCESS APPLICATION"; btn.style.pointerEvents = "all";
-    vOut.innerHTML = `<div style="color:#ef4444">Connection Failed: ${e.message}</div>`;
+    document.getElementById('v-out').innerHTML = `<div style="color:#ef4444">Connection Failed: ${e.message}</div>`;
   }
 }
 
@@ -622,8 +708,19 @@ async function askO() {
   const inp = document.getElementById('o-input'); const q = inp.value.trim(); if(!q) return;
   inp.value = ''; addMsg('user', q);
   const loaderId = addBotLoading();
+  const boardroom = document.getElementById('boardroom-toggle').checked;
+  
   try {
-    const r = await fetch('/api/query', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ question: q, history: hst, recommended_cards: currentCardsContext }) });
+    const r = await fetch('/api/query', { 
+        method:'POST', 
+        headers:{'Content-Type':'application/json'}, 
+        body: JSON.stringify({ 
+            question: q, 
+            history: hst, 
+            recommended_cards: currentCardsContext,
+            boardroom_mode: boardroom
+        }) 
+    });
     const d = await r.json(); 
     document.getElementById(loaderId).remove();
     addMsg('bot', d.answer || '...');
