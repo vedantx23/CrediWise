@@ -1,109 +1,128 @@
-import { useState, useCallback } from 'react'
-import SpendForm from '../components/SpendForm.jsx'
-import ScanningAnimation from '../components/ScanningAnimation.jsx'
-import PersonaCard from '../components/PersonaCard.jsx'
-import { runPersona } from '../api.js'
+import { useState } from 'react'
+import { runPersona } from '../api'
+import VaultCard from '../components/VaultCard'
+import { VaultButton, VaultInput } from '../components/VaultForms'
+import PersonaScan from '../components/PersonaScan'
+import HoloCard from '../components/HoloCard'
+import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
+import { useToast } from '../components/VaultToast'
+import { inr } from '../utils/format'
+
+const CATEGORIES = ['dining','fuel','grocery','travel','online','utilities','international','other']
+const DEFAULT_SPEND = Object.fromEntries(CATEGORIES.map(c => [c, '']))
 
 export default function PersonaPage() {
-  const [phase,   setPhase]   = useState('form')   // 'form' | 'scanning' | 'result'
-  const [result,  setResult]  = useState(null)
-  const [error,   setError]   = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [spend, setSpend]       = useState(DEFAULT_SPEND)
+  const [income, setIncome]     = useState('')
+  const [cibil, setCibil]       = useState('')
+  const [loading, setLoading]   = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [result, setResult]     = useState(null)
+  const toast = useToast()
 
-  async function handleSubmit(payload) {
+  const handleSubmit = async e => {
+    e.preventDefault()
     setLoading(true)
-    setError(null)
+    setResult(null)
     try {
-      const data = await runPersona(payload)
-      setResult(data)
-      setPhase('scanning')   // kick off the scan animation
-    } catch (e) {
-      setError(e.message || 'Persona engine failed. Is the backend running?')
+      const res = await runPersona({
+        monthly_spend: Object.fromEntries(
+          Object.entries(spend).map(([k,v]) => [k, Number(v)||0])
+        ),
+        income_annual: Number(income)||0,
+        cibil_score:   Number(cibil)||700,
+        current_cards: [],
+      })
+      setScanning(true)
+      setTimeout(() => {
+        setLoading(false)
+        setResult(res)
+      }, 2800)
+    } catch(err) {
+      toast.add(err.response?.data?.error || 'Persona detection failed', 'error')
       setLoading(false)
     }
   }
 
-  const handleScanComplete = useCallback(() => {
-    setPhase('result')
-    setLoading(false)
-  }, [])
-
   return (
-    <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-
-      {/* Scan overlay */}
-      {phase === 'scanning' && result && (
-        <ScanningAnimation
-          personaName={result.persona_name}
-          personaEmoji={result.persona_emoji}
-          onComplete={handleScanComplete}
-        />
+    <div style={{ padding:'40px 48px', maxWidth:1200 }}>
+      {scanning && result && (
+        <PersonaScan persona={result.persona} onDone={() => setScanning(false)} />
       )}
 
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 text-vault-muted text-xs font-mono mb-2">
-          <span>🎭</span> PERSONA ENGINE
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-2">Discover Your Financial Persona</h1>
-        <p className="text-vault-textDim text-sm">
-          Our ML classifier analyses your spend DNA and reveals your financial archetype.
-          Takes 2 seconds.
-        </p>
-      </div>
+      <h1 className="vault-heading">Persona Engine</h1>
+      <p className="vault-subtext">
+        Our ML model reads your spend DNA and identifies your financial archetype.
+      </p>
 
-      <div className={`grid gap-8 ${phase === 'result' ? 'lg:grid-cols-2' : ''}`}>
-
-        {/* Form */}
-        <div className="glass rounded-2xl border border-vault-border p-6">
-          <h2 className="text-sm font-semibold text-vault-textDim uppercase tracking-wider
-                         font-mono mb-5">Your Spend Profile</h2>
-          <SpendForm
-            onSubmit={handleSubmit}
-            loading={loading}
-            submitLabel="Reveal My Persona →"
-          />
-          {error && (
-            <div className="mt-4 p-3 rounded-lg bg-red-900/30 border border-red-800/50 text-red-400 text-sm">
-              {error}
+      <div style={{ display:'grid', gridTemplateColumns:'400px 1fr', gap:24, alignItems:'start' }}>
+        <VaultCard>
+          <h2 style={{ fontFamily:'var(--font-ui)', fontSize:11, fontWeight:500, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--plat-muted)', margin:'0 0 20px' }}>
+            Monthly Spend
+          </h2>
+          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              {CATEGORIES.map(cat => (
+                <VaultInput key={cat} label={cat} currency type="number" placeholder="0"
+                  value={spend[cat]} onChange={e => setSpend(s => ({...s,[cat]:e.target.value}))} />
+              ))}
             </div>
+            <VaultInput label="Annual Income (₹)" currency type="number" placeholder="1200000"
+              value={income} onChange={e => setIncome(e.target.value)} />
+            <VaultInput label="CIBIL Score" type="number" placeholder="740"
+              value={cibil} onChange={e => setCibil(e.target.value)} />
+            <VaultButton type="submit" loading={loading}>Reveal My Persona</VaultButton>
+          </form>
+        </VaultCard>
+
+        <div>
+          {!result && !loading && (
+            <VaultCard style={{ minHeight:320, display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <p style={{ color:'var(--plat-muted)', fontFamily:'var(--font-mono)', fontSize:13, textAlign:'center' }}>
+                Awaiting spending data...
+              </p>
+            </VaultCard>
+          )}
+
+          {result && !scanning && (
+            <ScrollReveal stagger={100}>
+              <VaultCard active>
+                <div style={{ textAlign:'center', padding:'12px 0' }}>
+                  <div style={{ fontFamily:'var(--font-display)', fontWeight:300, fontSize:'clamp(28px,4vw,48px)', color:'var(--gold-bright)', letterSpacing:'0.08em', animation:'persona-bounce 500ms var(--ease-snap)' }}>
+                    {result.persona}
+                  </div>
+                  <div style={{ fontFamily:'var(--font-ui)', fontWeight:300, fontSize:14, color:'var(--plat-cool)', marginTop:8 }}>
+                    Confidence: <span style={{ color:'var(--gold-hot)', fontFamily:'var(--font-mono)' }}>{(result.confidence * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+              </VaultCard>
+
+              <div style={{ marginTop:24 }}>
+                <h3 style={{ fontFamily:'var(--font-ui)', fontSize:11, fontWeight:500, letterSpacing:'0.15em', textTransform:'uppercase', color:'var(--plat-muted)', marginBottom:16 }}>
+                  Recommended Cards
+                </h3>
+                <div style={{ display:'flex', gap:20, flexWrap:'wrap', justifyContent:'center' }}>
+                  {result.recommendations?.slice(0,3).map(rec => (
+                    <HoloCard key={rec.card_id} card={{
+                      card_id: rec.card_id,
+                      name: rec.card_name || rec.card_id,
+                      bank: rec.bank || '',
+                      reward_categories: rec.reward_rates
+                        ? Object.entries(rec.reward_rates).map(([cat,rate]) => ({ category:cat, rate_percent:rate }))
+                        : [],
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
           )}
         </div>
-
-        {/* Result */}
-        {phase === 'result' && result && (
-          <div>
-            <PersonaCard result={result} />
-          </div>
-        )}
-
       </div>
 
-      {/* Persona previews */}
-      {phase === 'form' && (
-        <div className="mt-10">
-          <p className="text-xs text-vault-muted font-mono uppercase tracking-wider mb-4">
-            Which one are you?
-          </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {[
-              { emoji:'✈️', name:'Stealth Nomad',         hint:'High travel + international'},
-              { emoji:'🛍️', name:'High-Street Architect', hint:'Dining + online shopping'},
-              { emoji:'📊', name:'Reward Arbitrageur',    hint:'Multi-card optimizer'},
-              { emoji:'🧘', name:'Frugal Zen Master',     hint:'Zero fee, low complexity'},
-            ].map(p => (
-              <div key={p.name}
-                className="glass rounded-xl border border-vault-border p-4 text-center
-                           hover:border-vault-gold/30 transition-colors cursor-default">
-                <div className="text-3xl mb-2">{p.emoji}</div>
-                <p className="text-sm font-semibold text-vault-text mb-1">{p.name}</p>
-                <p className="text-xs text-vault-muted">{p.hint}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-    </main>
+      <style>{`
+        .vault-heading { font-family:var(--font-display);font-weight:400;font-size:clamp(24px,3vw,36px);color:var(--plat-white);letter-spacing:0.05em;margin:0 0 4px;padding-bottom:8px;border-bottom:1px solid var(--gold-dim);display:inline-block; }
+        .vault-subtext { font-family:var(--font-ui);font-weight:300;font-size:15px;color:var(--plat-cool);line-height:1.7;margin:8px 0 32px; }
+      `}</style>
+    </div>
   )
 }

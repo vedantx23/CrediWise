@@ -44,3 +44,23 @@ venv.bak
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Node / Frontend
+node_modules/
+*/node_modules/
+frontend/dist/
+**/dist/
+*.local
+
+# SQLite WAL files
+*.db-shm
+*.db-wal
+
+# Generated files (runtime)
+crediwise-ai/backend/memory/
+crediwise-ai/backend/reports/
+crediwise-ai/backend/data/uploads/
+crediwise-ai/backend/data/ocr_uploads/
+
+# ML model binaries (large — regenerate with seed_data.py)
+crediwise-ai/backend/models/*.pkl

@@ -2,6 +2,7 @@
 database.py — SQLite connection manager + migration runner for CrediWise-AI
 """
 
+from __future__ import annotations
 import sqlite3
 import os
 import json

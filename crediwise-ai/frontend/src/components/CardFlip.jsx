@@ -48,6 +48,37 @@ export default function CardFlip({ card, rewards = {}, className = '' }) {
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && setFlipped(f => !f)}
     >
+      <style>{`
+        .card-scene {
+          width: 300px; height: 190px;
+          perspective: 1200px;
+          cursor: pointer;
+          flex-shrink: 0;
+        }
+        .card-3d {
+          width: 100%; height: 100%;
+          transform-style: preserve-3d;
+          position: relative;
+          transition: transform 680ms cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        .card-3d.flipped { transform: rotateY(180deg); }
+        .card-face {
+          position: absolute; inset: 0;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
+        }
+        .card-back {
+          transform: rotateY(180deg);
+          background: #0e0e1a;
+          border: 1px solid rgba(212,175,55,0.15);
+          padding: 16px;
+          display: flex; flex-direction: column;
+        }
+        .card-scene:hover .card-3d:not(.flipped) { transform: perspective(1200px) rotateY(-8deg) rotateX(3deg); }
+      `}</style>
       <div className={`card-3d ${flipped ? 'flipped' : ''}`}>
 
         {/* ── FRONT ───────────────────────────────────────────────────────── */}
