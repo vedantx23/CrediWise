@@ -5,6 +5,13 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Attach JWT token to every request if available
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('crediwise_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
 export async function runAudit(payload) {
   const { data } = await api.post('/audit', payload)
   if (!data.success) throw new Error(data.error)

@@ -984,6 +984,19 @@ def predict_approval_endpoint():
         return err(f"Prediction failed: {str(e)}", 500)
 
 
+# ── Register auth + CRUD routes (ported from main branch) ────────────────────
+from auth import (
+    register_auth_routes, register_expense_routes,
+    register_instrument_routes, register_analytics_routes,
+    register_user_cards_routes, seed_demo_user,
+)
+register_auth_routes(app)
+register_expense_routes(app)
+register_instrument_routes(app)
+register_analytics_routes(app)
+register_user_cards_routes(app)
+
+
 if __name__ == "__main__":
     print("🔧 Initialising database…")
     run_migrations()
@@ -994,6 +1007,9 @@ if __name__ == "__main__":
     if len(get_all_cards()) == 0:
         print("🌱 Seeding card data…")
         seed()
+
+    # Seed demo user
+    seed_demo_user()
 
     # Seed first rate snapshot if history is empty
     from downgrade_detector import get_latest_history

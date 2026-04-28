@@ -2,21 +2,27 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Home, ShieldCheck, CreditCard, Fingerprint,
-  FileText, Users, TrendingUp,
+  FileText, Users, TrendingUp, LayoutDashboard,
+  Receipt, UserCircle, LogOut,
 } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
 const NAV_ITEMS = [
-  { to: '/',          icon: Home,         label: 'Home' },
-  { to: '/audit',     icon: ShieldCheck,  label: 'Audit' },
-  { to: '/persona',   icon: Fingerprint,  label: 'Persona' },
-  { to: '/approval',  icon: CreditCard,   label: 'Cards' },
-  { to: '/simulator', icon: TrendingUp,   label: 'Life Events' },
-  { to: '/community', icon: Users,        label: 'Community' },
-  { to: '/report',    icon: FileText,     label: 'Reports' },
+  { to: '/',           icon: Home,            label: 'Home' },
+  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/expenses',   icon: Receipt,         label: 'Expenses' },
+  { to: '/audit',      icon: ShieldCheck,     label: 'Audit' },
+  { to: '/persona',    icon: Fingerprint,     label: 'Persona' },
+  { to: '/approval',   icon: CreditCard,      label: 'Cards' },
+  { to: '/simulator',  icon: TrendingUp,      label: 'Life Events' },
+  { to: '/community',  icon: Users,           label: 'Community' },
+  { to: '/report',     icon: FileText,        label: 'Reports' },
+  { to: '/profile',    icon: UserCircle,      label: 'Profile' },
 ]
 
 export default function VaultNav() {
   const [expanded, setExpanded] = useState(false)
+  const { user, logout } = useAuth()
 
   return (
     <nav
