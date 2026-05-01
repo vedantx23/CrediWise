@@ -22,18 +22,18 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <h1>💳 CrediWise</h1>
-          <p>Smart decisions for every transaction</p>
+    <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-[#111] border border-gray-800 rounded-2xl shadow-2xl p-8 backdrop-blur-lg">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-[#d4af37] tracking-wider mb-2">💳 CREDIWISE</h1>
+          <p className="text-gray-400">Smart decisions for every transaction</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email Address</label>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address</label>
             <input
-              className="form-input"
+              className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-colors"
               type="email"
               placeholder="you@example.com"
               value={form.email}
@@ -42,10 +42,10 @@ export default function Login() {
             />
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Password</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Password</label>
             <input
-              className="form-input"
+              className="w-full bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#d4af37] focus:ring-1 focus:ring-[#d4af37] transition-colors"
               type="password"
               placeholder="••••••••"
               value={form.password}
@@ -54,18 +54,22 @@ export default function Login() {
             />
           </div>
 
-          {error && <div className="form-error">{error}</div>}
+          {error && <div className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded">{error}</div>}
 
-          <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
+          <button 
+            className="w-full bg-gradient-to-r from-[#bf953f] via-[#fcf6ba] to-[#b38728] text-black font-bold py-3 px-4 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
+            disabled={loading}
+          >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
 
-          <div className="auth-divider">
+          <div className="text-center text-gray-400 text-sm pt-4 border-t border-gray-800 mt-6">
             Don't have an account?{' '}
-            <Link to="/register" className="auth-link">Create one</Link>
+            <Link to="/register" className="text-[#d4af37] hover:underline font-medium">Create one</Link>
           </div>
         </form>
       </div>
     </div>
+
   );
 }

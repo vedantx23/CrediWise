@@ -1,0 +1,119 @@
+.vault-intro-container {
+  position: fixed;
+  inset: 0;
+  background: #000; /* True black per requirements */
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+
+.vault-intro-container.fade-out {
+  opacity: 0;
+  transform: scale(1.04);
+  pointer-events: none;
+}
+
+.intro-content-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+/* 200ms: Horizontal gold line */
+.intro-line {
+  position: absolute;
+  top: 50%;
+  left: -20vw;
+  right: -20vw;
+  height: 1px;
+  background: var(--gold-bright);
+  transform: scaleX(0);
+  transform-origin: center;
+}
+
+.intro-line.animate {
+  animation: line-expand 500ms var(--ease-vault) forwards;
+}
+
+@keyframes line-expand {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* 700ms: CREDIWISE text */
+.intro-text-main {
+  font-family: var(--font-display);
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  font-size: clamp(28px, 5vw, 52px);
+  color: var(--gold-bright);
+  opacity: 0;
+  transform: translateY(12px);
+  margin-right: -0.4em; /* offset letter-spacing on last char */
+}
+
+.intro-text-main.animate {
+  animation: text-slide-up 600ms var(--ease-vault) forwards;
+}
+
+@keyframes text-slide-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1100ms: AI text */
+.intro-text-sub {
+  font-family: var(--font-ui);
+  font-weight: 300;
+  letter-spacing: 0.6em;
+  font-size: 13px;
+  color: var(--plat-cool);
+  margin-top: 16px;
+  display: flex;
+  margin-right: -0.6em;
+}
+
+.intro-char {
+  opacity: 0;
+}
+
+.intro-char.animate {
+  animation: fade-in 400ms ease forwards;
+}
+
+@keyframes fade-in {
+  to { opacity: 1; }
+}
+
+/* 1500ms: SVG Border */
+.intro-svg-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.intro-rect {
+  fill: none;
+  stroke: var(--gold-dim);
+  stroke-width: 1;
+  stroke-dasharray: 1000; /* arbitrarily large */
+  stroke-dashoffset: 1000;
+}
+
+.intro-rect.animate {
+  animation: draw-border 400ms linear forwards;
+}
+
+@keyframes draw-border {
+  to { stroke-dashoffset: 0; }
+}

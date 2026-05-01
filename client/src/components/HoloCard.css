@@ -1,0 +1,229 @@
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.holo-container {
+  width: 380px;
+  height: 240px;
+  perspective: 1000px;
+  cursor: none; /* vault cursor */
+}
+
+.holo-card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 600ms ease;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.holo-card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.holo-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0D1219 0%, #1A2332 50%, #0D1219 100%);
+  overflow: hidden;
+  box-shadow: 
+    0 0 0 1px rgba(212, 175, 55, 0.2),
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(212, 175, 55, 0.08);
+}
+
+.holo-face.back {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+}
+
+/* Holographic overlay */
+.holo-face::before {
+  content: "";
+  position: absolute;
+  inset: -50%; /* Allow overflow so the gradient can shift via background-position */
+  background: conic-gradient(
+    from var(--angle), 
+    transparent 0deg, 
+    rgba(212, 175, 55, 0.15) 60deg, 
+    rgba(100, 180, 255, 0.1) 120deg, 
+    transparent 180deg,
+    rgba(212, 175, 55, 0.08) 240deg, 
+    transparent 360deg
+  );
+  animation: hologram 8s linear infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 1;
+  transition: transform 100ms linear;
+}
+
+@keyframes hologram {
+  to {
+    --angle: 360deg;
+  }
+}
+
+/* Front Face Elements */
+.holo-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.holo-top, .holo-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.holo-bottom {
+  align-items: flex-end;
+}
+
+.holo-bank {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--plat-cool);
+  text-transform: uppercase;
+}
+
+.holo-network svg {
+  width: 48px;
+  height: auto;
+  fill: var(--gold-bright);
+}
+
+.holo-chip {
+  width: 32px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--gold-dim);
+  background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(212,175,55,0.3));
+  position: relative;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+/* Chip grid lines */
+.holo-chip::before, .holo-chip::after {
+  content: "";
+  position: absolute;
+  background: var(--gold-dim);
+}
+
+.holo-chip::before {
+  top: 30%; bottom: 30%; left: 0; right: 0;
+  border-top: 1px solid var(--gold-dim);
+  border-bottom: 1px solid var(--gold-dim);
+  background: transparent;
+}
+
+.holo-chip::after {
+  top: 0; bottom: 0; left: 30%; right: 30%;
+  border-left: 1px solid var(--gold-dim);
+  border-right: 1px solid var(--gold-dim);
+  background: transparent;
+}
+
+.holo-name {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 22px;
+  color: var(--plat-white);
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.holo-number {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--plat-cool);
+  letter-spacing: 0.1em;
+}
+
+.holo-expiry {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--plat-muted);
+  text-align: right;
+}
+
+.holo-expiry-label {
+  display: block;
+  font-size: 8px;
+  margin-bottom: 2px;
+}
+
+/* Back Face Elements */
+.holo-back-title {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: var(--plat-cool);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.holo-rates-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+.holo-rate-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.1);
+  padding-bottom: 8px;
+}
+
+.holo-rate-cat {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  color: var(--plat-white);
+}
+
+.holo-rate-val {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--gold-bright);
+}
+
+.holo-rate-val.pulse {
+  animation: rate-pulse 2s infinite ease-in-out;
+}
+
+@keyframes rate-pulse {
+  0%, 100% { text-shadow: 0 0 2px rgba(212,175,55,0.4); opacity: 0.8; }
+  50% { text-shadow: 0 0 10px rgba(212,175,55,1); opacity: 1; }
+}
+
+.holo-magstripe {
+  height: 40px;
+  background: #000;
+  width: calc(100% + 48px);
+  margin-left: -24px;
+  margin-top: -8px;
+  margin-bottom: 16px;
+}

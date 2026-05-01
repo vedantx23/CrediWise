@@ -1,0 +1,111 @@
+.vault-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  transition: all 200ms var(--ease-vault);
+  cursor: none; /* Let VaultCursor handle it */
+  outline: none;
+}
+
+.vault-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-void), 0 0 0 4px var(--gold-bright);
+}
+
+/* Primary Button */
+.vault-btn-primary {
+  background: transparent;
+  border: 1px solid var(--gold-mid);
+  color: var(--gold-bright);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  padding: 12px 28px;
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+
+.vault-btn-primary:hover {
+  background: var(--gold-glow);
+  border-color: var(--gold-bright);
+  color: var(--gold-hot);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.2), inset 0 0 20px rgba(212, 175, 55, 0.05);
+  transform: translateY(-1px);
+}
+
+.vault-btn-primary:active {
+  transform: translateY(0) scale(0.97); /* 0.97 per micro-interactions checklist */
+  transition-duration: 100ms; /* fast active state */
+}
+
+/* Ghost Button */
+.vault-btn-ghost {
+  background: transparent;
+  border: none;
+  color: var(--plat-cool);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 8px 16px;
+  position: relative;
+}
+
+.vault-btn-ghost::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: var(--gold-dim);
+  transform: scaleX(0);
+  transition: transform 200ms var(--ease-vault);
+}
+
+.vault-btn-ghost:hover {
+  color: var(--plat-white);
+}
+
+.vault-btn-ghost:hover::after {
+  transform: scaleX(1);
+}
+
+.vault-btn-ghost:active {
+  transform: scale(0.97);
+  transition-duration: 100ms;
+}
+
+/* Loading State */
+.vault-btn.loading {
+  pointer-events: none;
+}
+
+.vault-btn.loading .btn-text {
+  opacity: 0;
+}
+
+.btn-loader {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--gold-bright);
+  border-radius: 50%;
+  animation: dot-pulse 900ms infinite;
+}
+
+.btn-dot:nth-child(1) { animation-delay: 0ms; }
+.btn-dot:nth-child(2) { animation-delay: 300ms; }
+.btn-dot:nth-child(3) { animation-delay: 600ms; }
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}

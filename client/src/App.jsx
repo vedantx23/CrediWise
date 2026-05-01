@@ -11,58 +11,80 @@ import Recommend from './pages/Recommend';
 import Profile from './pages/Profile';
 import { CardProvider } from './context/CardContext';
 import './index.css';
+import AuditPage from './pages/AuditPage';
+import VaultNav from './components/VaultNav';
 
 function ProtectedLayout() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   return (
-    <div className="app-layout" style={{ display: 'flex', flexDirection: 'column' }}>
-      <Navbar />
-      <div className="main-content">
+    <div className="flex min-h-screen bg-[#050505] text-white">
+      <VaultNav />
+      <main className="flex-1 ml-[72px] relative min-h-screen overflow-x-hidden">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<AuditPage />} />
           <Route path="/cards" element={<Instruments />} />
           <Route path="/rewards" element={<Recommend />} />
           <Route path="/spending" element={<Expenses />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/insights" element={<Dashboard />} />
         </Routes>
-      </div>
+      </main>
     </div>
   );
 }
-
 function PublicRoute({ children }) {
   const { user } = useAuth();
   if (user) return <Navigate to="/" replace />;
   return children;
 }
 
+import React, { useState, useEffect } from 'react';
+import VaultBackground from './components/VaultBackground';
+import VaultCursor from './components/VaultCursor';
+import VaultIntro from './components/VaultIntro';
+
 export default function App() {
+  const [introDone, setIntroDone] = useState(() => {
+    return !!sessionStorage.getItem('vault_intro_seen');
+  });
+
   return (
     <AuthProvider>
       <CardProvider>
-        <BrowserRouter>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: '#1e293b',
-                color: '#f1f5f9',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                fontSize: '13px',
-              },
-              success: { iconTheme: { primary: '#10b981', secondary: '#0a0e1a' } },
-              error: { iconTheme: { primary: '#ef4444', secondary: '#0a0e1a' } },
-            }}
-          />
-          <Routes>
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
-            <Route path="/*" element={<ProtectedLayout />} />
-          </Routes>
-        </BrowserRouter>
+        <VaultCursor />
+        <VaultBackground />
+        <VaultIntro onComplete={() => setIntroDone(true)} />
+        
+        <div style={{
+          opacity: introDone ? 1 : 0,
+          transition: 'opacity 400ms ease',
+          position: 'relative',
+          zIndex: 1,
+          height: '100%'
+        }}>
+          <BrowserRouter>
+            <Toaster
+              position="top-right"
+              toastOptions={{
+                style: {
+                  background: 'var(--bg-overlay)',
+                  color: 'var(--plat-white)',
+                  border: '1px solid var(--gold-dim)',
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '13px',
+                },
+                success: { iconTheme: { primary: 'var(--status-pass-fg)', secondary: 'var(--bg-void)' } },
+                error: { iconTheme: { primary: 'var(--status-crit-fg)', secondary: 'var(--bg-void)' } },
+              }}
+            />
+            <Routes>
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+              <Route path="/*" element={<ProtectedLayout />} />
+            </Routes>
+          </BrowserRouter>
+        </div>
       </CardProvider>
     </AuthProvider>
   );
