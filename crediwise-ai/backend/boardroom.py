@@ -87,7 +87,7 @@ def _load_memory(memory_dir: Path, user_id: str, agent: str) -> list[dict]:
     p = _memory_path(memory_dir, user_id, agent)
     if p.exists():
         try:
-            return json.loads(p.read_text())[-10:]   # keep last 10 for context
+            return json.loads(p.read_text(encoding="utf-8"))[-10:]   # keep last 10 for context
         except Exception:
             pass
     return []
@@ -102,7 +102,7 @@ def _save_memory(
     history = _load_memory(memory_dir, user_id, agent)
     history.append(exchange)
     history = history[-keep:]   # cap at last 5 exchanges
-    p.write_text(json.dumps(history, indent=2, ensure_ascii=False))
+    p.write_text(json.dumps(history, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 # ─── RAG: card context retrieval ─────────────────────────────────────────────
@@ -319,7 +319,10 @@ def run_boardroom(
         f"Income: ₹{int(income_annual):,}/yr  |  CIBIL: {cibil_score}"
     )
     if current_cards:
-        contextual_question += f"\nCurrent cards: {', '.join(current_cards)}"
+        # Filter out non-strings just in case
+        safe_cards = [str(c) for c in current_cards if c]
+        if safe_cards:
+            contextual_question += f"\nCurrent cards: {', '.join(safe_cards)}"
 
     transcript = []
     prior_responses: dict[str, str] = {}

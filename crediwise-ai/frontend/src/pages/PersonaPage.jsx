@@ -47,7 +47,7 @@ export default function PersonaPage() {
   return (
     <div style={{ padding:'40px 48px', maxWidth:1200 }}>
       {scanning && result && (
-        <PersonaScan persona={result.persona} onDone={() => setScanning(false)} />
+        <PersonaScan persona={result.persona_name} onDone={() => setScanning(false)} />
       )}
 
       <h1 className="vault-heading">Persona Engine</h1>
@@ -89,7 +89,7 @@ export default function PersonaPage() {
               <VaultCard active>
                 <div style={{ textAlign:'center', padding:'12px 0' }}>
                   <div style={{ fontFamily:'var(--font-display)', fontWeight:300, fontSize:'clamp(28px,4vw,48px)', color:'var(--gold-bright)', letterSpacing:'0.08em', animation:'persona-bounce 500ms var(--ease-snap)' }}>
-                    {result.persona}
+                    {result.persona_name}
                   </div>
                   <div style={{ fontFamily:'var(--font-ui)', fontWeight:300, fontSize:14, color:'var(--plat-cool)', marginTop:8 }}>
                     Confidence: <span style={{ color:'var(--gold-hot)', fontFamily:'var(--font-mono)' }}>{(result.confidence * 100).toFixed(0)}%</span>

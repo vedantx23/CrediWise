@@ -7,6 +7,29 @@ import HoloCard from '../components/HoloCard'
 import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
 import { useToast } from '../components/VaultToast'
 import { inr } from '../utils/format'
+import { useCardContext } from '../context/CardContext'
+
+const NAME_TO_ID = {
+  "HDFC Regalia Gold": "hdfc_regalia",
+  "HDFC Infinia": "hdfc_infinia",
+  "HDFC Millennia": "hdfc_millennia",
+  "Amazon Pay ICICI": "icici_amazon",
+  "ICICI Coral": "icici_coral",
+  "ICICI Rubyx": "icici_rubyx",
+  "ICICI Sapphiro": "icici_sapphiro",
+  "Axis Ace": "axis_ace",
+  "Flipkart Axis": "axis_flipkart",
+  "SBI SimplyCLICK": "sbi_simplyclick",
+  "SBI Elite": "sbi_elite",
+  "SBI Prime": "sbi_prime",
+  "Amex Membership Rewards Credit Card": "amex_mrcc",
+  "Amex Gold Card": "amex_gold",
+  "Kotak 811 Dream Different": "kotak_811",
+  "Kotak League Platinum": "kotak_league",
+  "IndusInd Platinum": "indusind_platinum",
+  "IndusInd Legend": "indusind_legend",
+  "AU LIT": "au_lit"
+};
 
 const CATEGORIES = ['dining','fuel','grocery','travel','online','utilities','international','other']
 const DEFAULT_SPEND = Object.fromEntries(CATEGORIES.map(c => [c, '']))
@@ -19,6 +42,7 @@ export default function PersonaPage() {
   const [scanning, setScanning] = useState(false)
   const [result, setResult]     = useState(null)
   const toast = useToast()
+  const { userCards } = useCardContext()
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -31,7 +55,7 @@ export default function PersonaPage() {
         ),
         income_annual: Number(income)||0,
         cibil_score:   Number(cibil)||700,
-        current_cards: [],
+        current_cards: userCards.map(c => NAME_TO_ID[c.Card_Name] || c.Card_Name).filter(Boolean),
       })
       setScanning(true)
       setTimeout(() => {
@@ -47,7 +71,7 @@ export default function PersonaPage() {
   return (
     <div style={{ padding:'40px 48px', maxWidth:1200 }}>
       {scanning && result && (
-        <PersonaScan persona={result.persona} onDone={() => setScanning(false)} />
+        <PersonaScan persona={result.persona_name} onDone={() => setScanning(false)} />
       )}
 
       <h1 className="vault-heading">Persona Engine</h1>
@@ -89,7 +113,7 @@ export default function PersonaPage() {
               <VaultCard active>
                 <div style={{ textAlign:'center', padding:'12px 0' }}>
                   <div style={{ fontFamily:'var(--font-display)', fontWeight:300, fontSize:'clamp(28px,4vw,48px)', color:'var(--gold-bright)', letterSpacing:'0.08em', animation:'persona-bounce 500ms var(--ease-snap)' }}>
-                    {result.persona}
+                    {result.persona_name}
                   </div>
                   <div style={{ fontFamily:'var(--font-ui)', fontWeight:300, fontSize:14, color:'var(--plat-cool)', marginTop:8 }}>
                     Confidence: <span style={{ color:'var(--gold-hot)', fontFamily:'var(--font-mono)' }}>{(result.confidence * 100).toFixed(0)}%</span>

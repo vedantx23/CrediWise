@@ -134,7 +134,7 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="flex-shrink-0">
-                <SpendDial spend={demoSpend} maxSpend={100000} rate={demoRate} />
+                <SpendDial totalMonthlySpend={demoSpend} effectiveRate={demoRate} />
               </div>
             </div>
           </div>

@@ -7,12 +7,10 @@ import {
 
 const NAV_ITEMS = [
   { to: '/',          icon: Home,         label: 'Home' },
-  { to: '/audit',     icon: ShieldCheck,  label: 'Audit' },
+ 
   { to: '/persona',   icon: Fingerprint,  label: 'Persona' },
   { to: '/approval',  icon: CreditCard,   label: 'Cards' },
-  { to: '/simulator', icon: TrendingUp,   label: 'Life Events' },
-  { to: '/community', icon: Users,        label: 'Community' },
-  { to: '/report',    icon: FileText,     label: 'Reports' },
+ 
 ]
 
 export default function VaultNav() {

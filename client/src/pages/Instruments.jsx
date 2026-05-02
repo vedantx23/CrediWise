@@ -30,12 +30,15 @@ export default function Instruments() {
   };
 
   const handleRemoveCard = async (card) => {
-    if (!confirm(`Remove ${card.Card_Name}?`)) return;
+    // Temporarily removing confirm to ensure deletion works without blocking
     try {
-      await removeUserCard(card._instrumentId);
-      toast.success('Card removed');
+      setSaving(true);
+      await removeUserCard(card.Card_Name);
+      toast.success('Card removed from vault');
     } catch (err) {
       toast.error('Failed to remove card. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 

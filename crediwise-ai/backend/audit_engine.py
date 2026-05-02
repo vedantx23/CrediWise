@@ -136,6 +136,7 @@ def _find_recommendations(
             "card_name":     name,
             "bank":          meta.get("bank", ""),
             "annual_fee":    meta.get("annual_fee", 0),
+            "reward_rates":  rates,
             "marginal_nav":  round(marginal_nav, 2),
             "shap_values":   shap,
             "reason":        _build_reason(name, shap, marginal_nav),
@@ -149,7 +150,7 @@ def _find_recommendations(
 
 # ─── Public API ──────────────────────────────────────────────────────────────
 
-def run_audit(user_profile: dict) -> dict:
+def run_audit(user_profile: dict, top_n: int = 3) -> dict:
     """
     Main entry point for the Shadow Audit Engine.
 
@@ -224,7 +225,7 @@ def run_audit(user_profile: dict) -> dict:
     # ── Recommendations ──────────────────────────────────────────────────────
     recs = _find_recommendations(
         spend, current_cards, all_rewards, current_best, card_meta,
-        income_annual=income, cibil_score=cibil
+        income_annual=income, cibil_score=cibil, top_n=top_n
     )
 
     # ── Current card breakdown ───────────────────────────────────────────────

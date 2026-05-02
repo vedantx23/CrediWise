@@ -88,19 +88,33 @@ export function CardProvider({ children }) {
     }
   }, [userCards]);
 
-  const removeUserCard = useCallback(async (cardName) => {
-    const card = userCards.find(c => c.Card_Name === cardName);
-    if (!card || !card._instrumentId) {
-      // Fallback: just remove from local state
+  const removeUserCard = useCallback(async (identifier) => {
+    console.log('[CardContext] Attempting to remove card with identifier:', identifier);
+    // Find card by name OR instrument ID to be safe
+    const card = userCards.find(c => c.Card_Name === identifier || c._instrumentId === identifier);
+    
+    if (!card) {
+      console.warn('[CardContext] Card not found for identifier:', identifier);
+      return;
+    }
+
+    const cardName = card.Card_Name;
+    const instrumentId = card._instrumentId;
+    console.log('[CardContext] Found card:', cardName, 'with ID:', instrumentId);
+
+    if (!instrumentId) {
+      console.log('[CardContext] No instrumentId found, performing local-only removal for:', cardName);
       setUserCards(prev => prev.filter(c => c.Card_Name !== cardName));
       return;
     }
 
     try {
-      await api.delete(`/instruments/${card._instrumentId}`);
+      console.log('[CardContext] Calling DELETE /api/instruments/' + instrumentId);
+      await api.delete(`/instruments/${instrumentId}`);
+      console.log('[CardContext] DELETE successful, updating local state for:', cardName);
       setUserCards(prev => prev.filter(c => c.Card_Name !== cardName));
     } catch (err) {
-      console.error('Failed to remove card:', err);
+      console.error('[CardContext] Failed to remove card:', err);
       throw err;
     }
   }, [userCards]);

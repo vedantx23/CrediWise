@@ -27,6 +27,7 @@ import ApprovalPage from './pages/ApprovalPage';
 import SimulatorPage from './pages/SimulatorPage';
 import CommunityPage from './pages/CommunityPage';
 import ReportPage from './pages/ReportPage';
+import BoardroomPage from './pages/BoardroomPage';
 
 // ── Protected layout: sidebar + all app pages ──
 function ProtectedLayout() {
@@ -47,6 +48,7 @@ function ProtectedLayout() {
           <Route path="/simulator"  element={<SimulatorPage />} />
           <Route path="/community"  element={<CommunityPage />} />
           <Route path="/report"     element={<ReportPage />} />
+          <Route path="/boardroom"  element={<BoardroomPage />} />
 
           {/* Data management features (Node.js backend) */}
           <Route path="/cards"      element={<Instruments />} />

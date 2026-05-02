@@ -365,8 +365,8 @@ def _persona_card_recs(
     from audit_engine import run_audit
     from database import get_all_cards, get_all_rewards_map
 
-    # Run full audit to get ranked cards
-    audit_result = run_audit(user_profile)
+    # Run full audit to get a wide pool of ranked cards
+    audit_result = run_audit(user_profile, top_n=12)
     recs = audit_result.get("recommendations", [])
 
     persona = PERSONAS[persona_id]
@@ -385,21 +385,28 @@ def _persona_card_recs(
         cid  = rec["card_id"]
         meta = cards_meta.get(cid, {})
 
-        # Persona-fit bonus
+        # Persona-fit bonus (Significant weight to archetype alignment)
         bonus = 0
         if cid in ideal_ids:
-            bonus += 30
+            bonus += 5000  # High bonus to surface persona-specific cards
+        
         if req_lounge and (meta.get("lounge_domestic", 0) or meta.get("lounge_intl", 0)):
-            bonus += 20
+            bonus += 2000
+        
         if req_free and meta.get("is_lifetime_free", 0):
-            bonus += 25
+            bonus += 1500
 
         # Bonus for performing well in persona's preferred categories
+        # Weight the categories themselves
         shap = rec.get("shap_values", {})
         pref_shap = sum(shap.get(cat, 0) for cat in preferred)
-        bonus += pref_shap / 1000.0   # scale down for mixing
+        bonus += pref_shap * 1.5   # 1.5x multiplier for preferred category improvement
 
-        scored.append({**rec, "persona_score": rec["marginal_nav"] + bonus})
+        # Add a small random discovery factor (jitter) to prevent static results
+        import random
+        jitter = random.uniform(0, 150) # Small random bonus to vary results slightly
+        
+        scored.append({**rec, "persona_score": rec["marginal_nav"] + bonus + jitter})
 
     scored.sort(key=lambda x: x["persona_score"], reverse=True)
 
