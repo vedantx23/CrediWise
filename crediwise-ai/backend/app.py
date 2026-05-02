@@ -13,7 +13,7 @@ from flask_cors import CORS
 # Make backend importable when running from project root
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from database import run_migrations, get_user, execute
+from database import run_migrations, get_user, execute, query
 from audit_engine import run_audit
 from persona_engine import predict_persona
 from statement_parser import parse_statement, categorize
