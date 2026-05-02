@@ -1,7 +1,16 @@
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
+import { CardProvider } from './context/CardContext';
+
+// ── Vault UI shell ──
+import VaultBackground from './components/VaultBackground';
+import VaultCursor from './components/VaultCursor';
+import VaultIntro from './components/VaultIntro';
+import VaultNav from './components/VaultNav';
+
+// ── Portal A pages (auth-gated, Node.js backend) ──
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -9,11 +18,17 @@ import Expenses from './pages/Expenses';
 import Instruments from './pages/Instruments';
 import Recommend from './pages/Recommend';
 import Profile from './pages/Profile';
-import { CardProvider } from './context/CardContext';
-import './index.css';
-import AuditPage from './pages/AuditPage';
-import VaultNav from './components/VaultNav';
 
+// ── Portal B pages (AI features, Flask backend) ──
+import HomePage from './pages/HomePage';
+import AuditPage from './pages/AuditPage';
+import PersonaPage from './pages/PersonaPage';
+import ApprovalPage from './pages/ApprovalPage';
+import SimulatorPage from './pages/SimulatorPage';
+import CommunityPage from './pages/CommunityPage';
+import ReportPage from './pages/ReportPage';
+
+// ── Protected layout: sidebar + all app pages ──
 function ProtectedLayout() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -22,27 +37,34 @@ function ProtectedLayout() {
       <VaultNav />
       <main className="flex-1 ml-[72px] relative min-h-screen overflow-x-hidden">
         <Routes>
-          <Route path="/" element={<AuditPage />} />
-          <Route path="/cards" element={<Instruments />} />
-          <Route path="/rewards" element={<Recommend />} />
-          <Route path="/spending" element={<Expenses />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/insights" element={<Dashboard />} />
+          {/* Landing / Home */}
+          <Route path="/"           element={<HomePage />} />
+
+          {/* AI-powered features (Flask backend) */}
+          <Route path="/audit"      element={<AuditPage />} />
+          <Route path="/persona"    element={<PersonaPage />} />
+          <Route path="/approval"   element={<ApprovalPage />} />
+          <Route path="/simulator"  element={<SimulatorPage />} />
+          <Route path="/community"  element={<CommunityPage />} />
+          <Route path="/report"     element={<ReportPage />} />
+
+          {/* Data management features (Node.js backend) */}
+          <Route path="/cards"      element={<Instruments />} />
+          <Route path="/rewards"    element={<Recommend />} />
+          <Route path="/spending"   element={<Expenses />} />
+          <Route path="/insights"   element={<Dashboard />} />
+          <Route path="/profile"    element={<Profile />} />
         </Routes>
       </main>
     </div>
   );
 }
+
 function PublicRoute({ children }) {
   const { user } = useAuth();
   if (user) return <Navigate to="/" replace />;
   return children;
 }
-
-import React, { useState, useEffect } from 'react';
-import VaultBackground from './components/VaultBackground';
-import VaultCursor from './components/VaultCursor';
-import VaultIntro from './components/VaultIntro';
 
 export default function App() {
   const [introDone, setIntroDone] = useState(() => {
@@ -55,7 +77,7 @@ export default function App() {
         <VaultCursor />
         <VaultBackground />
         <VaultIntro onComplete={() => setIntroDone(true)} />
-        
+
         <div style={{
           opacity: introDone ? 1 : 0,
           transition: 'opacity 400ms ease',
