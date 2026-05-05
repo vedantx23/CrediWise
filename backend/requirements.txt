@@ -3,4 +3,6 @@ flask-cors==4.0.0
 scikit-learn==1.3.2
 pandas==2.1.4
 shap==0.44.0
-sqlite3-api # (Built-in but keeping track)
+joblib==1.3.2
+requests==2.31.0
+sqlite3-api

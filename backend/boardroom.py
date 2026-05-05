@@ -2,8 +2,8 @@ import os
 import json
 import requests
 
-OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL = "llama3" # Make sure to have this model pulled in Ollama
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+MODEL = "llama3:latest" # Explicitly use latest tag
 
 MEMORY_DIR = os.path.join(os.path.dirname(__file__), "memory")
 os.makedirs(MEMORY_DIR, exist_ok=True)
@@ -44,7 +44,7 @@ def query_agent(agent_name, system_context, user_prompt, user_id):
             "model": MODEL,
             "messages": messages,
             "stream": False
-        }, timeout=15)
+        }, timeout=60)
         
         if response.status_code == 200:
             result = response.json()["message"]["content"]
@@ -55,9 +55,11 @@ def query_agent(agent_name, system_context, user_prompt, user_id):
             
             return result
         else:
+            print(f"Ollama error (Status {response.status_code}): {response.text}", flush=True)
             return f"{agent_name} is currently offline."
-    except requests.exceptions.RequestException:
+    except requests.exceptions.RequestException as e:
         # Fallback if Ollama isn't running locally
+        print(f"Ollama connection error: {e}", flush=True)
         return f"[Simulated {agent_name} response since Ollama is unreachable at {OLLAMA_URL}]"
 
 def run_boardroom_debate(user_id, user_profile_summary, card_facts):

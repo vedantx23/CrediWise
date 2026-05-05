@@ -63,11 +63,25 @@ export default function BoardroomPage() {
 
       const res = await runBoardroom(payload)
       
+      const agentMeta = {
+        Max: { emoji: '📊', color: 'blue' },
+        Sage: { emoji: '✈️', color: 'purple' },
+        Mint: { emoji: '🌿', color: 'green' }
+      }
+
       // Append the question and the agent responses to transcript
       setTranscript(prev => [
         ...prev,
         { type: 'user', content: currentQuestion, timestamp: new Date() },
-        ...res.transcript.map(agent => ({ ...agent, type: 'agent', timestamp: new Date() }))
+        ...(res.debate || []).map(d => ({
+          type: 'agent',
+          name: d.agent,
+          role: d.role,
+          response: d.text,
+          emoji: agentMeta[d.agent]?.emoji || '🤖',
+          color: agentMeta[d.agent]?.color || 'gray',
+          timestamp: new Date()
+        }))
       ])
     } catch (err) {
       toast.add(err.message || 'The boardroom is currently offline.', 'error')

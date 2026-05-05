@@ -3,7 +3,7 @@ import os
 import json
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'data', 'cards.db')
-SCHEMA_PATH = os.path.join(os.path.dirname(__file__), '..', 'migrations', '001_initial_schema.sql')
+SCHEMA_PATH = os.path.join(os.path.dirname(__file__), 'migrations', '001_initial_schema.sql')
 
 def init_db():
     print(f"Initializing DB at {DB_PATH}")

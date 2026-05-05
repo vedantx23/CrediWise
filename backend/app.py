@@ -290,8 +290,25 @@ def boardroom():
         return jsonify({"success": False, "error": "Missing user_id"}), 400
         
     user_id = data['user_id']
-    profile = data.get('profile_summary', "Average spender looking for options.")
-    facts = data.get('card_facts', "HDFC Regalia gives 2.6% on travel.")
+    question = data.get('question', "What is my best financial move?")
+    monthly_spend = data.get('monthly_spend', {})
+    current_cards = data.get('current_cards', [])
+    
+    # Build a more descriptive profile for the AI agents
+    if isinstance(monthly_spend, dict):
+        total_spend = sum(monthly_spend.values())
+        spend_details = ", ".join([f"{k}: ₹{v}" for k, v in monthly_spend.items() if v > 0])
+    else:
+        total_spend = 0
+        spend_details = "No detailed spend available"
+        
+    profile = f"Question: {question}. Total monthly spend: ₹{total_spend}. Breakdown: {spend_details}."
+    
+    # Build facts based on current cards
+    if current_cards:
+        facts = f"User currently owns: {', '.join(current_cards)}."
+    else:
+        facts = "User has no current credit cards."
     
     debate = run_boardroom_debate(user_id, profile, facts)
     return jsonify({"success": True, "data": {"debate": debate}, "error": None})
@@ -799,5 +816,5 @@ def recommend():
 
 if __name__ == '__main__':
 
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5001)
 
