@@ -28,6 +28,7 @@ import SimulatorPage from './pages/SimulatorPage';
 import CommunityPage from './pages/CommunityPage';
 import ReportPage from './pages/ReportPage';
 import BoardroomPage from './pages/BoardroomPage';
+import OptimizerPage from './pages/OptimizerPage';
 
 // ── Protected layout: sidebar + all app pages ──
 function ProtectedLayout() {
@@ -49,6 +50,7 @@ function ProtectedLayout() {
           <Route path="/community"  element={<CommunityPage />} />
           <Route path="/report"     element={<ReportPage />} />
           <Route path="/boardroom"  element={<BoardroomPage />} />
+          <Route path="/optimizer"  element={<OptimizerPage />} />
 
           {/* Data management features (Node.js backend) */}
           <Route path="/cards"      element={<Instruments />} />

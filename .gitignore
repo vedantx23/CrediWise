@@ -6,67 +6,44 @@ __pycache__/
 .Python
 env/
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-MANIFEST
 
 # ML/Data
 models/*.pkl
 models/*.h5
-models/*.joblib
 .ipynb_checkpoints
 
 # Environment/Secrets
 .env
 .venv
 venv/
-ENV/
-env.bak
-venv.bak
 
 # OS
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Node / Frontend
+# Node
 node_modules/
-*/node_modules/
 **/node_modules/
-frontend/dist/
 **/dist/
 *.local
 
-# SQLite
+# SQLite (legacy)
 *.db
 *.sqlite
 *.db-shm
 *.db-wal
 
-# Generated files (runtime)
-crediwise-ai/backend/memory/
-crediwise-ai/backend/reports/
-crediwise-ai/backend/data/uploads/
-crediwise-ai/backend/data/ocr_uploads/
+# IDE
+.idea/
+.vscode/
+
+# Generated
 backend/memory/
 backend/reports/
-
-# ML model binaries (large — regenerate with seed_data.py)
-crediwise-ai/backend/models/*.pkl
 backend/models/*.pkl
+
+# Logs
+*.log

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { runAudit } from '../api/ai'
+import { useState, useEffect } from 'react'
+import api from '../api'
 import VaultCard from '../components/VaultCard'
 import { VaultButton, VaultInput } from '../components/VaultForms'
 import SpendDial from '../components/SpendDial'
@@ -7,13 +7,22 @@ import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
 import { useToast } from '../components/VaultToast'
 import { inr } from '../utils/format'
 
-const CATEGORIES = ['dining','fuel','grocery','travel','online','utilities','international','other']
-const DEFAULT_SPEND = Object.fromEntries(CATEGORIES.map(c => [c, '']))
+const CATEGORIES = [
+  { key: 'Food & Dining', label: 'dining' },
+  { key: 'Fuel', label: 'fuel' },
+  { key: 'Groceries', label: 'grocery' },
+  { key: 'Travel', label: 'travel' },
+  { key: 'Shopping', label: 'online' },
+  { key: 'Utilities & Bills', label: 'utilities' },
+  { key: 'Entertainment', label: 'entertainment' },
+  { key: 'Other', label: 'other' },
+]
 
 const SCANNING_LINES = [
-  '> initializing shadow audit engine...',
-  '> cross-referencing 847 card configurations...',
-  '> calculating reward leakage...',
+  '> initializing portfolio audit engine...',
+  '> cross-referencing 27 Indian card configurations...',
+  '> calculating reward leakage across categories...',
+  '> checking exclusions, caps & accelerated rewards...',
 ]
 
 function CountUp({ target, duration = 1200, prefix = '₹' }) {
@@ -29,7 +38,6 @@ function CountUp({ target, duration = 1200, prefix = '₹' }) {
     }
     requestAnimationFrame(raf)
   }, [target])
-
   return <>{prefix}{value.toLocaleString('en-IN')}</>
 }
 
@@ -47,43 +55,85 @@ function TypeLine({ text, speed = 35, onDone }) {
 }
 
 export default function AuditPage() {
-  const [spend, setSpend] = useState(DEFAULT_SPEND)
-  const [cards, setCards] = useState('')
+  const [spend, setSpend] = useState(Object.fromEntries(CATEGORIES.map(c => [c.key, ''])))
+  const [walletCards, setWalletCards] = useState([])
+  const [allCards, setAllCards] = useState([])
+  const [selectedCards, setSelectedCards] = useState([])
+  const [showDirectory, setShowDirectory] = useState(false)
   const [phase, setPhase] = useState('idle') // idle | scanning | result
   const [scanLine, setScanLine] = useState(0)
   const [result, setResult] = useState(null)
   const toast = useToast()
 
+  useEffect(() => {
+    fetchWallet()
+    fetchDirectory()
+  }, [])
+
+  async function fetchWallet() {
+    try {
+      const res = await api.get('/instruments')
+      const names = (res.data.instruments || []).map(i => i.name)
+      setWalletCards(names)
+      setSelectedCards(names)
+    } catch (err) { /* ok */ }
+  }
+
+  async function fetchDirectory() {
+    try {
+      const res = await api.get('/optimizer/cards')
+      setAllCards(res.data.cards || [])
+    } catch (err) { /* ok */ }
+  }
+
+  function toggleCard(name) {
+    setSelectedCards(prev =>
+      prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name]
+    )
+  }
+
   const totalSpend = Object.values(spend).reduce((s, v) => s + (Number(v) || 0), 0)
-  const effectiveRate = result
-    ? (result.current_nav_annual / (totalSpend * 12) * 100) || 0
-    : totalSpend > 0 ? 1.5 : 0
+  const effectiveRate = result ? result.summary.overallRewardRate : (totalSpend > 0 ? 1.5 : 0)
 
   const handleSubmit = async e => {
     e.preventDefault()
+    if (selectedCards.length === 0) {
+      toast.add('Please select at least one card', 'error')
+      return
+    }
+    if (totalSpend === 0) {
+      toast.add('Enter your monthly spend', 'error')
+      return
+    }
+
     setPhase('scanning')
     setScanLine(0)
     setResult(null)
 
-    const profile = {
-      monthly_spend: Object.fromEntries(
-        Object.entries(spend).map(([k, v]) => [k, Number(v) || 0])
-      ),
-      current_cards: cards.split(',').map(s => s.trim()).filter(Boolean),
-      income_annual: 0, cibil_score: 700,
-    }
+    const monthlyProfile = {}
+    CATEGORIES.forEach(({ key }) => {
+      const val = Number(spend[key]) || 0
+      if (val > 0) monthlyProfile[key] = val
+    })
+
     try {
-      const res = await runAudit(profile)
-      // Wait for scanning animation (3 lines × ~1s)
+      const res = await api.post('/optimizer/audit', {
+        userCards: selectedCards,
+        monthlyProfile
+      })
+      // Wait for scanning animation
       setTimeout(() => {
-        setResult(res)
+        setResult(res.data)
         setPhase('result')
-      }, 3200)
-    } catch(err) {
-      toast.add(err.response?.data?.error || 'Audit failed', 'error')
+      }, 3500)
+    } catch (err) {
+      toast.add(err.response?.data?.message || 'Audit failed', 'error')
       setPhase('idle')
     }
   }
+
+  const leakage = result ? result.summary.annualGap : 0
+  const status = leakage > 5000 ? 'critical' : leakage > 1000 ? 'warning' : 'pass'
 
   const statusColor = {
     pass:     'var(--status-pass-fg)',
@@ -94,9 +144,9 @@ export default function AuditPage() {
   return (
     <div className="audit-page">
       <div className="audit-header">
-        <h1 className="vault-heading">Shadow Audit</h1>
+        <h1 className="vault-heading">Portfolio Audit</h1>
         <p className="vault-subtext">
-          Discover exactly how much your current card stack is leaving on the table.
+          Discover exactly how much your current card stack is leaving on the table — powered by 27 Indian card configurations with exclusions, caps & accelerated rewards.
         </p>
       </div>
 
@@ -104,34 +154,64 @@ export default function AuditPage() {
         {/* ── Left: Input form ── */}
         <div className="audit-left">
           <VaultCard>
+            <h2 className="section-label">Your Cards</h2>
+            <div className="card-chips-wrap">
+              {walletCards.length > 0 ? (
+                <div className="card-chips">
+                  {walletCards.map(name => (
+                    <button
+                      key={name}
+                      className={`audit-chip ${selectedCards.includes(name) ? 'selected' : ''}`}
+                      onClick={() => toggleCard(name)}
+                    >
+                      {name.replace(/ Credit Card$/, '')}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p style={{ color: 'var(--plat-muted)', fontSize: 11 }}>No cards in wallet. Browse directory below.</p>
+              )}
+              <button className="browse-btn" onClick={() => setShowDirectory(!showDirectory)}>
+                {showDirectory ? '▾ Hide directory' : '▸ Add from directory'}
+              </button>
+              {showDirectory && (
+                <div className="card-chips directory">
+                  {allCards.filter(c => !walletCards.includes(c.name)).map(card => (
+                    <button
+                      key={card.name}
+                      className={`audit-chip ${selectedCards.includes(card.name) ? 'selected' : ''}`}
+                      onClick={() => toggleCard(card.name)}
+                    >
+                      <span className="chip-bank-tiny">{card.bank}</span> {card.name.replace(/ Credit Card$/, '').replace(card.bank + ' ', '')}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </VaultCard>
+
+          <VaultCard style={{ marginTop: 16 }}>
             <h2 className="section-label">Monthly Spend</h2>
             <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:16 }}>
               <div className="spend-grid">
-                {CATEGORIES.map(cat => (
+                {CATEGORIES.map(({ key, label }) => (
                   <VaultInput
-                    key={cat}
-                    label={cat}
+                    key={key}
+                    label={label}
                     currency
                     type="number"
                     placeholder="0"
-                    value={spend[cat]}
-                    onChange={e => setSpend(s => ({ ...s, [cat]: e.target.value }))}
+                    value={spend[key]}
+                    onChange={e => setSpend(s => ({ ...s, [key]: e.target.value }))}
                   />
                 ))}
               </div>
-              <VaultInput
-                label="Current Cards (comma-separated IDs)"
-                placeholder="hdfc_regalia, icici_amazon"
-                value={cards}
-                onChange={e => setCards(e.target.value)}
-              />
               <VaultButton type="submit" loading={phase === 'scanning'}>
                 Run Audit
               </VaultButton>
             </form>
           </VaultCard>
 
-          {/* Spend Dial */}
           <VaultCard style={{ marginTop: 16, display:'flex', justifyContent:'center' }}>
             <SpendDial totalMonthlySpend={totalSpend} effectiveRate={effectiveRate} />
           </VaultCard>
@@ -142,7 +222,7 @@ export default function AuditPage() {
           {phase === 'idle' && (
             <VaultCard style={{ height:'100%', display:'flex', alignItems:'center', justifyContent:'center', minHeight:320 }}>
               <p style={{ color:'var(--plat-muted)', fontFamily:'var(--font-mono)', fontSize:13, textAlign:'center' }}>
-                Enter your monthly spend<br/>and run the audit.
+                Select your cards, enter monthly spend<br/>and run the audit.
               </p>
             </VaultCard>
           )}
@@ -171,67 +251,87 @@ export default function AuditPage() {
                   <div
                     className="leakage-amount"
                     style={{
-                      color: statusColor[result.status] || 'var(--gold-bright)',
-                      animation: result.status === 'critical' ? 'pulse-crit 1s ease infinite' : 'none',
+                      color: statusColor[status],
+                      animation: status === 'critical' ? 'pulse-crit 1s ease infinite' : 'none',
                     }}
                   >
-                    <CountUp target={result.leakage_inr} />
+                    <CountUp target={leakage} />
                   </div>
                   <p className="leakage-label">leaving your wallet every year</p>
-                  <span
-                    className={`status-badge ${result.status}`}
-                    style={{
-                      animation: result.status === 'critical' ? 'badge-pulse 2s ease infinite' : 'none',
-                    }}
-                  >
-                    {result.status?.toUpperCase()}
+                  <span className={`status-badge ${status}`}>
+                    {status.toUpperCase()}
                   </span>
                 </div>
                 <div className="nav-grid" style={{ marginTop:20 }}>
                   <div>
-                    <div className="nav-label-sm">Current NAV</div>
-                    <div className="nav-value">{inr(result.current_nav_annual)}</div>
+                    <div className="nav-label-sm">Current Rewards</div>
+                    <div className="nav-value">{inr(result.summary.currentMonthlyRewards * 12)}<span className="per-yr">/yr</span></div>
                   </div>
                   <div>
-                    <div className="nav-label-sm">Optimal NAV</div>
-                    <div className="nav-value gold">{inr(result.optimal_nav_annual)}</div>
+                    <div className="nav-label-sm">Optimal (Market Best)</div>
+                    <div className="nav-value gold">{inr(result.summary.optimalMonthlyRewards * 12)}<span className="per-yr">/yr</span></div>
+                  </div>
+                </div>
+                <div className="nav-grid" style={{ marginTop:12 }}>
+                  <div>
+                    <div className="nav-label-sm">Your Reward Rate</div>
+                    <div className="nav-value">{result.summary.overallRewardRate}%</div>
+                  </div>
+                  <div>
+                    <div className="nav-label-sm">Monthly Spend</div>
+                    <div className="nav-value">{inr(result.summary.totalMonthlySpend)}</div>
                   </div>
                 </div>
               </VaultCard>
 
-              {/* Recommendations */}
-              {result.recommendations?.map((rec, i) => (
-                <VaultCard key={rec.card_id} style={{ animationDelay: `${i * 120}ms` }} className="slide-in">
+              {/* Suggestions */}
+              {result.suggestions?.length > 0 && result.suggestions.map((s, i) => (
+                <VaultCard key={i} className="slide-in" style={{ animationDelay: `${i * 120}ms` }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                     <div>
-                      <div className="rec-card-name">{rec.card_name || rec.card_id}</div>
-                      <div className="rec-reason">{rec.reason}</div>
+                      <div className="rec-card-name">{s.suggestedCard}</div>
+                      <div className="rec-reason">
+                        For <strong>{s.category}</strong> — switch from {s.currentCard} ({s.currentRate}%) → {s.suggestedRate}%
+                      </div>
                     </div>
-                    <div className="rec-gain">{inr(rec.nav_gain || 0)}<span>/yr</span></div>
+                    <div className="rec-gain">{inr(s.annualSavings)}<span>/yr</span></div>
                   </div>
-                  {rec.shap_values && Object.keys(rec.shap_values).length > 0 && (
-                    <div className="shap-bars" style={{ marginTop:12 }}>
-                      {Object.entries(rec.shap_values)
-                        .filter(([,v]) => v > 0)
-                        .sort((a,b) => b[1]-a[1])
-                        .slice(0,4)
-                        .map(([cat, val]) => (
-                          <div key={cat} className="shap-row">
-                            <span className="shap-cat">{cat}</span>
-                            <div className="shap-track">
-                              <div
-                                className="shap-fill"
-                                style={{ width: `${Math.min(val / 3000 * 100, 100)}%` }}
-                              />
-                            </div>
-                            <span className="shap-val">+{inr(val)}</span>
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
                 </VaultCard>
               ))}
+
+              {/* Category Breakdown */}
+              {result.findings?.length > 0 && (
+                <VaultCard>
+                  <h2 className="section-label">Category Breakdown</h2>
+                  <div className="findings-table">
+                    {result.findings.map((f, i) => (
+                      <div key={i} className={`finding-row ${f.isOptimal ? 'optimal' : 'sub-optimal'}`}>
+                        <div className="finding-cat">{f.category}</div>
+                        <div className="finding-spend">{inr(f.monthlySpend)}/mo</div>
+                        <div className="finding-card">{f.bestCard}</div>
+                        <div className="finding-rate">{f.bestRate}%</div>
+                        <div className="finding-reward">{inr(f.monthlyReward)}</div>
+                        {!f.isOptimal && (
+                          <div className="finding-gap">↑ {inr(f.gap)}/mo gap</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </VaultCard>
+              )}
+
+              {/* Milestone Advice */}
+              {result.milestoneAdvice?.length > 0 && (
+                <VaultCard>
+                  <h2 className="section-label">🎯 Milestone Tracking</h2>
+                  {result.milestoneAdvice.map((m, i) => (
+                    <div key={i} className="milestone-row">
+                      <strong>{m.card}</strong>
+                      <p style={{ margin: '4px 0 0', color: 'var(--plat-muted)', fontSize: 12 }}>{m.advice}</p>
+                    </div>
+                  ))}
+                </VaultCard>
+              )}
             </ScrollReveal>
           )}
         </div>
@@ -248,9 +348,32 @@ export default function AuditPage() {
           display: inline-block;
         }
         .vault-subtext { font-family: var(--font-ui); font-weight: 300; font-size: 15px; color: var(--plat-cool); line-height: 1.7; margin: 8px 0 32px; }
-        .section-label { font-family: var(--font-ui); font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--plat-muted); margin: 0 0 20px; }
-        .audit-layout { display: grid; grid-template-columns: 400px 1fr; gap: 24px; align-items: start; }
+        .section-label { font-family: var(--font-ui); font-size: 11px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; color: var(--plat-muted); margin: 0 0 16px; }
+        .audit-layout { display: grid; grid-template-columns: 420px 1fr; gap: 24px; align-items: start; }
         .spend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+        /* Card chips */
+        .card-chips-wrap { margin-bottom: 8px; }
+        .card-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+        .card-chips.directory { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(212,175,55,0.08); }
+        .audit-chip {
+          padding: 4px 10px; border-radius: 5px;
+          border: 1px solid rgba(212,175,55,0.15);
+          background: var(--bg-raised, #0D1219);
+          color: var(--plat-muted); font-size: 10px;
+          cursor: pointer; transition: all 120ms;
+        }
+        .audit-chip.selected {
+          background: rgba(212,175,55,0.12);
+          border-color: var(--gold-bright);
+          color: var(--gold-bright);
+        }
+        .chip-bank-tiny { font-size: 8px; opacity: 0.6; text-transform: uppercase; }
+        .browse-btn {
+          background: none; border: none; color: var(--plat-muted);
+          font-size: 10px; cursor: pointer; padding: 4px 0;
+        }
+        .browse-btn:hover { color: var(--gold-bright); }
 
         /* Scan terminal */
         .scan-terminal { font-family: var(--font-mono); font-size: 13px; color: var(--gold-bright); line-height: 2; position: relative; z-index: 1; }
@@ -275,31 +398,42 @@ export default function AuditPage() {
           display: inline-block;
           font-family: var(--font-ui); font-size: 11px; font-weight: 600;
           letter-spacing: 0.15em;
-          padding: 4px 14px; border-radius: var(--radius-pill);
-          animation: scale-in 300ms var(--ease-snap) forwards;
+          padding: 4px 14px; border-radius: var(--radius-pill, 20px);
         }
-        .status-badge.pass     { background: var(--status-pass);  color: var(--status-pass-fg); }
-        .status-badge.warning  { background: var(--status-warn);  color: var(--status-warn-fg); }
-        .status-badge.critical { background: var(--status-crit);  color: var(--status-crit-fg); }
+        .status-badge.pass     { background: var(--status-pass, rgba(16,185,129,0.1));  color: var(--status-pass-fg, #10B981); }
+        .status-badge.warning  { background: var(--status-warn, rgba(251,191,36,0.1));  color: var(--status-warn-fg, #FBBF24); }
+        .status-badge.critical { background: var(--status-crit, rgba(248,113,113,0.1)); color: var(--status-crit-fg, #F87171); }
 
         .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         .nav-label-sm { font-family: var(--font-ui); font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--plat-muted); margin-bottom: 4px; }
-        .nav-value { font-family: var(--font-mono); font-size: 16px; color: var(--plat-bright); }
-        .nav-value.gold { color: var(--gold-hot); }
+        .nav-value { font-family: var(--font-mono); font-size: 16px; color: var(--plat-bright, #E8EDF2); }
+        .nav-value.gold { color: var(--gold-hot, #D4AF37); }
+        .per-yr { font-size: 11px; color: var(--plat-muted); margin-left: 2px; }
 
         .rec-card-name { font-family: var(--font-ui); font-size: 14px; font-weight: 500; color: var(--plat-white); letter-spacing: 0.05em; }
         .rec-reason { font-family: var(--font-ui); font-size: 12px; color: var(--plat-muted); margin-top: 4px; }
-        .rec-gain { font-family: var(--font-mono); font-size: 18px; color: var(--gold-hot); text-align: right; white-space: nowrap; }
+        .rec-gain { font-family: var(--font-mono); font-size: 18px; color: var(--gold-hot, #D4AF37); text-align: right; white-space: nowrap; }
         .rec-gain span { font-size: 11px; color: var(--plat-muted); margin-left: 2px; }
 
-        .shap-bars { display: flex; flex-direction: column; gap: 6px; }
-        .shap-row { display: flex; align-items: center; gap: 8px; }
-        .shap-cat { font-family: var(--font-mono); font-size: 10px; color: var(--plat-muted); width: 80px; flex-shrink: 0; text-transform: capitalize; }
-        .shap-track { flex: 1; height: 3px; background: var(--bg-overlay); border-radius: 2px; overflow: hidden; }
-        .shap-fill { height: 100%; background: var(--gold-mid); border-radius: 2px; transition: width 600ms var(--ease-vault); }
-        .shap-val { font-family: var(--font-mono); font-size: 10px; color: var(--gold-hot); width: 60px; text-align: right; flex-shrink: 0; }
+        /* Findings */
+        .findings-table { display: flex; flex-direction: column; gap: 6px; }
+        .finding-row {
+          display: flex; align-items: center; gap: 10px;
+          padding: 8px 10px; border-radius: 6px;
+          background: rgba(212,175,55,0.02);
+          font-size: 11px;
+        }
+        .finding-row.sub-optimal { background: rgba(251,191,36,0.04); }
+        .finding-cat { width: 100px; font-weight: 500; color: var(--plat-white); }
+        .finding-spend { width: 80px; color: var(--plat-muted); font-family: var(--font-mono); }
+        .finding-card { flex: 1; color: var(--plat-cool, #94A3B8); }
+        .finding-rate { width: 40px; color: var(--gold-bright); font-family: var(--font-mono); }
+        .finding-reward { width: 60px; color: var(--plat-white); font-family: var(--font-mono); }
+        .finding-gap { color: var(--status-warn-fg, #FBBF24); font-weight: 600; font-size: 10px; }
 
-        .slide-in { animation: slide-right 400ms var(--ease-vault) both; }
+        .milestone-row { padding: 8px 0; border-bottom: 1px solid rgba(212,175,55,0.06); }
+
+        .slide-in { animation: slide-right 400ms var(--ease-vault, ease) both; }
 
         @media (max-width: 900px) {
           .audit-layout { grid-template-columns: 1fr; }
