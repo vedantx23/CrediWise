@@ -21,11 +21,11 @@ router.get('/summary', async (req, res) => {
     // Monthly totals (last 6 months)
     const monthlyTotals = await Expense.aggregate([
       { $match: { user_id: userId } },
-      { 
-        $group: { 
-          _id: { $substr: ["$date", 0, 7] }, 
-          total: { $sum: "$amount" } 
-        } 
+      {
+        $group: {
+          _id: { $substr: ["$date", 0, 7] },
+          total: { $sum: "$amount" }
+        }
       },
       { $project: { month: "$_id", total: 1, _id: 0 } },
       { $sort: { month: -1 } },
@@ -35,18 +35,18 @@ router.get('/summary', async (req, res) => {
 
     // Category breakdown (current month)
     const categoryBreakdown = await Expense.aggregate([
-      { 
-        $match: { 
-          user_id: userId, 
-          date: { $regex: new RegExp(`^${currentMonth}`) } 
-        } 
+      {
+        $match: {
+          user_id: userId,
+          date: { $regex: new RegExp(`^${currentMonth}`) }
+        }
       },
-      { 
-        $group: { 
-          _id: "$category", 
+      {
+        $group: {
+          _id: "$category",
           total: { $sum: "$amount" },
           count: { $sum: 1 }
-        } 
+        }
       },
       { $project: { category: "$_id", total: 1, count: 1, _id: 0 } },
       { $sort: { total: -1 } }
@@ -54,11 +54,11 @@ router.get('/summary', async (req, res) => {
 
     // Total spent this month
     const monthTotalResult = await Expense.aggregate([
-      { 
-        $match: { 
-          user_id: userId, 
-          date: { $regex: new RegExp(`^${currentMonth}`) } 
-        } 
+      {
+        $match: {
+          user_id: userId,
+          date: { $regex: new RegExp(`^${currentMonth}`) }
+        }
       },
       { $group: { _id: null, total: { $sum: "$amount" } } }
     ]);
@@ -80,21 +80,21 @@ router.get('/summary', async (req, res) => {
     let totalRewardsValue = 0;
     const instrumentSummaries = await Promise.all(instruments.map(async (inst) => {
       const multipliers = inst.category_multipliers || {};
-      
+
       const categoryExpenses = await Expense.aggregate([
-        { 
-          $match: { 
-            user_id: userId, 
+        {
+          $match: {
+            user_id: userId,
             payment_instrument_id: inst._id,
             date: { $regex: new RegExp(`^${currentMonth}`) }
-          } 
+          }
         },
         { $group: { _id: "$category", total: { $sum: "$amount" } } }
       ]);
 
       let rawRewards = 0;
       categoryExpenses.forEach(exp => {
-        const mult = (inst.category_multipliers instanceof Map) 
+        const mult = (inst.category_multipliers instanceof Map)
           ? (inst.category_multipliers.get(exp._id) || 1)
           : (inst.category_multipliers?.[exp._id] || 1);
         rawRewards += exp.total * (inst.base_reward_rate / 100) * mult;

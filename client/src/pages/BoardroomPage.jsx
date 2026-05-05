@@ -21,15 +21,21 @@ export default function BoardroomPage() {
 
   // Fetch expenses for context
   useEffect(() => {
-    const fetchExpenses = async () => {
+    const fetchAnalytics = async () => {
       try {
-        const res = await api.get('/expenses');
-        setExpenses(res.data.monthly_spend || res.data.expenses || {});
+        const res = await api.get('/analytics/summary');
+        // Convert categoryBreakdown array [{category: 'Food', total: 100}] to {Food: 100}
+        const breakdown = res.data.categoryBreakdown || [];
+        const spendMap = {};
+        breakdown.forEach(item => {
+          spendMap[item.category] = item.total;
+        });
+        setExpenses(spendMap);
       } catch (err) {
-        console.error('Failed to fetch expenses for boardroom', err);
+        console.error('Failed to fetch analytics for boardroom', err);
       }
     };
-    fetchExpenses();
+    fetchAnalytics();
   }, []);
 
   const scrollToBottom = () => {

@@ -17,7 +17,7 @@ def test_everything():
         "current_cards": ["hdfc_millennia"]
     }
     resp = client.post('/api/audit', json=payload)
-    print(resp.get_json()['message'])
+    print(resp.get_json()['data']['message'])
     
     print("\n2. Testing /api/persona")
     resp = client.post('/api/persona', json={"monthly_spend": {"travel": 50000, "international": 20000}})
@@ -41,17 +41,16 @@ def test_everything():
     
     print("\n5. Testing /api/submit-combo")
     resp = client.post('/api/submit-combo', json={
-        "combo_id": "test_combo_1",
         "cards": ["Axis Ace", "HDFC Regalia"],
         "city": "Mumbai",
         "persona": "The Reward Arbitrageur",
         "nav_score": 15000
     })
-    print(resp.get_json()['data']['message'])
+    print(resp.get_json()['data']['display'])
     
     print("\n6. Testing /api/leaderboard")
     resp = client.get('/api/leaderboard?city=Mumbai&persona=The Reward Arbitrageur')
-    print(resp.get_json()['data']['leaderboard'][0]['message'])
+    print(resp.get_json()['data']['combos'][0]['display'])
     
     print("\nAll endpoints tested successfully!")
 

@@ -45,7 +45,7 @@ router.put('/:id', async (req, res) => {
 
     const updateDto = new CreateInstrumentDTO({ ...req.body, user_id: req.user.id });
     const updated = await InstrumentRepository.update(req.params.id, req.user.id, updateDto);
-    
+
     res.json({ instrument: updated });
   } catch (err) {
     console.error('Update instrument error:', err);

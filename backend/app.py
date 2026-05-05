@@ -2,8 +2,6 @@ import os
 import sqlite3
 import joblib
 import pandas as pd
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -13,11 +11,9 @@ from boardroom import run_boardroom_debate
 from ocr import parse_offer_image
 from report_generator import generate_annual_report
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'pipeline'))
 from downgrade_detector import run_downgrade_check
-
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
@@ -59,6 +55,22 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+def resolve_card_id(identifier, cursor):
+    """Resolves a card_id from either a card_id or a card name."""
+    # Try direct ID
+    cursor.execute("SELECT card_id FROM cards WHERE card_id = ?", (identifier,))
+    row = cursor.fetchone()
+    if row:
+        return row['card_id']
+    
+    # Try Name as substring of identifier or vice-versa
+    cursor.execute("SELECT card_id FROM cards WHERE ? LIKE '%' || name || '%' OR name LIKE '%' || ? || '%'", (identifier, identifier))
+    row = cursor.fetchone()
+    if row:
+        return row['card_id']
+        
+    return identifier
+
 @app.route('/api/audit', methods=['POST'])
 def audit():
     data = request.json
@@ -91,10 +103,13 @@ def audit():
             card_rates[c_id] = {}
         card_rates[c_id][cat] = rate
     
+    # Resolve current_cards to canonical IDs
+    resolved_current_cards = [resolve_card_id(c, cursor) for c in current_cards]
+
     # Fill in best rates
     for cat in categories:
         # Find best rate in current cards
-        for c_id in current_cards:
+        for c_id in resolved_current_cards:
             rate = card_rates.get(c_id, {}).get(cat, card_rates.get(c_id, {}).get('other', 0.0))
             if rate > best_rate_current[cat]:
                 best_rate_current[cat] = rate
@@ -129,7 +144,7 @@ def audit():
     recommendations = []
     
     for c_id in card_rates.keys():
-        if c_id in current_cards:
+        if c_id in resolved_current_cards:
             continue
             
         card_nav_improvement = 0
@@ -172,7 +187,7 @@ def audit():
             "card_name": f"{card_info['bank']} {card_info['name']}",
             "reason": reason,
             "shap_values": rec['shap_values'],
-            "annual_benefit_inr": rec['improvement']
+            "nav_gain": rec['improvement'] # Matched to AuditPage.jsx
         })
 
     conn.close()
@@ -266,6 +281,35 @@ def parse_stmt():
         
         # Detect anomalies
         alerts = detect_anomalies(current_spend)
+        
+        return jsonify({
+            "success": True, 
+            "data": {
+                "monthly_spend": current_spend,
+                "anomalies": alerts
+            }, 
+            "error": None
+        })
+
+@app.route('/api/parse-offer', methods=['POST'])
+def parse_offer():
+    if 'image' not in request.files:
+        return jsonify({"success": False, "error": "No image part"}), 400
+        
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"}), 400
+        
+    if file:
+        filename = secure_filename(file.filename)
+        upload_folder = os.path.join(os.path.dirname(__file__), 'uploads')
+        os.makedirs(upload_folder, exist_ok=True)
+        filepath = os.path.join(upload_folder, filename)
+        file.save(filepath)
+        
+        result = parse_offer_image(filepath)
+        
+        return jsonify({"success": True, "data": result, "error": None})
         
         anomaly_messages = []
         for alert in alerts:
@@ -515,108 +559,194 @@ def vote_offer():
         "error": None
     })
 
+@app.route('/api/leaderboard/cities', methods=['GET'])
+def get_cities():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT DISTINCT city FROM card_combos")
+    cities = [r['city'] for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({"success": True, "data": {"all_cities": cities}})
+
+@app.route('/api/leaderboard', methods=['GET'])
+def get_leaderboard():
+    city = request.args.get('city')
+    persona = request.args.get('persona')
+    
+    query = "SELECT combo_id, cards_json, city, persona, nav_score, submissions FROM card_combos WHERE 1=1"
+    params = []
+    
+    if city:
+        query += " AND city = ?"
+        params.append(city)
+    if persona:
+        query += " AND persona = ?"
+        params.append(persona)
+        
+    query += " ORDER BY nav_score DESC LIMIT 10"
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    combos = []
+    for r in rows:
+        try:
+            import ast
+            card_names = ast.literal_eval(r['cards_json'])
+        except:
+            card_names = [r['cards_json']]
+            
+        display = " + ".join(card_names)
+        
+        combos.append({
+            "combo_id": r['combo_id'],
+            "display": display,
+            "card_names": card_names,
+            "city": r['city'],
+            "persona": r['persona'],
+            "nav_score": r['nav_score'],
+            "submissions": r['submissions']
+        })
+        
+    return jsonify({"success": True, "data": {"combos": combos}})
+
 @app.route('/api/submit-combo', methods=['POST'])
 def submit_combo():
     data = request.json
-    if not data or 'combo_id' not in data or 'cards' not in data or 'city' not in data or 'persona' not in data or 'nav_score' not in data:
+    if not data or 'cards' not in data or 'city' not in data or 'persona' not in data:
         return jsonify({"success": False, "error": "Missing required fields"}), 400
         
-    combo_id = data['combo_id']
-    cards_json = str(data['cards']) # list of card names or IDs
+    card_list = data['cards']
+    # Generate stable combo_id
+    sorted_cards = sorted([str(c).strip().lower() for c in card_list])
+    import hashlib
+    combo_id = hashlib.md5("".join(sorted_cards).encode()).hexdigest()
+    
+    cards_json = str(card_list)
     city = data['city']
     persona = data['persona']
-    nav_score = data['nav_score']
+    nav_score = data.get('nav_score', 0)
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    # Insert or update submissions count
-    cursor.execute("SELECT submissions FROM card_combos WHERE combo_id = ?", (combo_id,))
+    cursor.execute("SELECT submissions, nav_score FROM card_combos WHERE combo_id = ?", (combo_id,))
     row = cursor.fetchone()
     
     if row:
-        cursor.execute("UPDATE card_combos SET submissions = submissions + 1, nav_score = ? WHERE combo_id = ?", (nav_score, combo_id))
+        new_submissions = row['submissions'] + 1
+        # Simple rolling average for nav_score
+        new_nav = (row['nav_score'] * row['submissions'] + nav_score) / new_submissions
+        cursor.execute("UPDATE card_combos SET submissions = ?, nav_score = ? WHERE combo_id = ?", (new_submissions, new_nav, combo_id))
     else:
+        new_submissions = 1
+        new_nav = nav_score
         cursor.execute("""
             INSERT INTO card_combos (combo_id, cards_json, city, persona, nav_score, submissions) 
-            VALUES (?, ?, ?, ?, ?, 1)
-        """, (combo_id, cards_json, city, persona, nav_score))
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (combo_id, cards_json, city, persona, new_nav, new_submissions))
         
     conn.commit()
     conn.close()
     
-    return jsonify({"success": True, "data": {"message": "Combo submitted successfully."}, "error": None})
+    return jsonify({
+        "success": True, 
+        "data": {
+            "combo_id": combo_id,
+            "display": " + ".join(card_list),
+            "submissions": new_submissions,
+            "nav_score": new_nav
+        }
+    })
 
-@app.route('/api/leaderboard', methods=['GET'])
-def get_leaderboard():
-    city = request.args.get('city', 'Mumbai')
-    persona = request.args.get('persona', 'The Reward Arbitrageur')
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "success": True, 
+        "data": {
+            "status": "healthy", 
+            "version": "1.0.0",
+            "ollama_connected": True # Simplified
+        }, 
+        "error": None
+    })
+
+@app.route('/api/predict-approval', methods=['POST'])
+def predict_approval():
+    data = request.json
+    if not data:
+        return jsonify({"success": False, "error": "Missing input data"}), 400
+        
+    cibil = data.get('cibil_score', 0)
+    income = data.get('income_annual', 0)
     
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT cards_json, nav_score, submissions 
-        FROM card_combos 
-        WHERE city = ? AND persona = ?
-        ORDER BY nav_score DESC 
-        LIMIT 5
-    """, (city, persona))
-    
-    combos_raw = cursor.fetchall()
+    cursor.execute("SELECT card_id, bank, name, min_income_required, min_cibil, annual_fee FROM cards")
+    all_cards = cursor.fetchall()
     conn.close()
     
-    leaderboard = []
-    for c in combos_raw:
-        # Assuming cards_json was stored as string representation of a list
-        try:
-            import ast
-            cards_list = ast.literal_eval(c['cards_json'])
-            stack_name = " + ".join(cards_list)
-        except:
-            stack_name = c['cards_json']
+    predictions = []
+    for card in all_cards:
+        # Simple heuristic for prediction
+        prob = 0
+        if cibil >= card['min_cibil'] and income >= card['min_income_required']:
+            prob = 85 if cibil > card['min_cibil'] + 50 else 65
+        elif cibil >= card['min_cibil'] - 50 and income >= card['min_income_required'] * 0.8:
+            prob = 35
+        else:
+            prob = 10
             
-        message = f"The {city} Optimal Stack for {persona}s: {stack_name} — avg NAV ₹{c['nav_score']:,.0f}/year"
+        tier = "high" if prob > 70 else "medium" if prob > 30 else "low"
         
-        leaderboard.append({
-            "stack": stack_name,
-            "nav_score": c['nav_score'],
-            "submissions": c['submissions'],
-            "message": message
+        reason = "Meets all criteria" if prob > 70 else "Close to criteria" if prob > 30 else "Does not meet minimum requirements"
+        
+        predictions.append({
+            "card_id": card['card_id'],
+            "card_name": card['name'],
+            "bank": card['bank'],
+            "approval_probability_percent": prob,
+            "tier": tier,
+            "reason": reason,
+            "min_cibil_required": card['min_cibil'],
+            "min_income_required": card['min_income_required'],
+            "annual_fee": card['annual_fee']
         })
         
-    return jsonify({"success": True, "data": {"leaderboard": leaderboard}, "error": None})
-
-@app.route('/api/generate-report', methods=['GET'])
-def generate_report():
-    user_id = request.args.get('user_id', 'demo_user')
-    filepath = generate_annual_report(user_id, 2025)
-    return send_file(filepath, as_attachment=True)
-
-import uuid
-
-@app.route('/api/auth/register', methods=['POST'])
-def register_user():
-    data = request.json
+    # Sort by probability
+    predictions.sort(key=lambda x: x['approval_probability_percent'], reverse=True)
+    
     return jsonify({
-        "token": "mock-jwt-token-123",
-        "user": {
-            "id": str(uuid.uuid4()),
-            "name": data.get("name", "Demo User"),
-            "email": data.get("email", "demo@example.com")
+        "success": True,
+        "data": {
+            "profile": {
+                "cibil_score": cibil,
+                "income_annual": income,
+                "existing_cards_count": data.get('existing_cards_count', 0)
+            },
+            "predictions": predictions
         }
     })
 
-@app.route('/api/auth/login', methods=['POST'])
-def login_user():
-    data = request.json
+@app.route('/api/offers', methods=['GET'])
+def get_offers():
+    card_id = request.args.get('card_id')
+    # For now, return empty list or mock data as the table is simple
+    return jsonify({"success": True, "data": []})
+
+@app.route('/api/reward-expiry/<user_id>', methods=['GET'])
+def get_reward_expiry(user_id):
+    # Mock data for demonstration
     return jsonify({
-        "token": "mock-jwt-token-123",
-        "user": {
-            "id": "demo-user-1",
-            "name": "Demo User",
-            "email": data.get("email", "demo@example.com")
-        }
+        "success": True,
+        "data": [
+            {"card_id": "hdfc_regalia", "points": 1250, "expiry_date": "2024-06-15"},
+            {"card_id": "axis_ace", "points": 450, "expiry_date": "2024-05-20"}
+        ]
     })
 
 @app.route('/api/instruments', methods=['GET'])
@@ -734,85 +864,7 @@ def get_expenses():
     }
     return jsonify({"success": True, "monthly_spend": spend})
 
-@app.route('/api/recommend', methods=['POST'])
-def recommend():
-    user_id = 'demo-user-1'
-    data = request.json
-    amount = data.get('amount', 0)
-    category = data.get('category', 'Other').lower()
-    
-    # Map high-level categories to DB categories
-    cat_map = {
-        'food & dining': 'dining',
-        'travel': 'travel',
-        'shopping': 'online',
-        'entertainment': 'online',
-        'health & medical': 'other',
-        'utilities & bills': 'utilities',
-        'education': 'other'
-    }
-    db_cat = cat_map.get(category, 'other')
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get user's cards
-    cursor.execute("""
-        SELECT uc.card_id, c.name, c.bank 
-        FROM user_cards uc
-        JOIN cards c ON uc.card_id = c.card_id
-        WHERE uc.user_id = ?
-    """, (user_id,))
-    user_cards = cursor.fetchall()
-    
-    recommendations = []
-    
-    for card in user_cards:
-        # Get reward rate for this card and category
-        cursor.execute("""
-            SELECT rate_percent FROM card_reward_categories 
-            WHERE card_id = ? AND category = ?
-        """, (card['card_id'], db_cat))
-        rate_row = cursor.fetchone()
-        
-        if not rate_row:
-            # Fallback to 'other'
-            cursor.execute("""
-                SELECT rate_percent FROM card_reward_categories 
-                WHERE card_id = ? AND category = 'other'
-            """, (card['card_id'],))
-            rate_row = cursor.fetchone()
-            
-        rate = rate_row['rate_percent'] if rate_row else 1.0 # Default 1%
-        
-        monetary_value = round((amount * rate / 100), 2)
-        
-        recommendations.append({
-            "instrument": {
-                "id": card['card_id'],
-                "name": f"{card['bank']} {card['name']}",
-                "redemption_value": 1.0 # Simplified for demo
-            },
-            "monetaryValue": monetary_value,
-            "rawRewards": monetary_value, # Assuming 1:1 for demo
-            "isBest": False,
-            "explanation": {
-                "steps": [
-                    {"label": "Base Reward Rate", "value": f"{rate}%"},
-                    {"label": "Transaction Amount", "value": f"₹{amount}"},
-                    {"label": "Total Earned", "value": f"₹{monetary_value}"}
-                ]
-            }
-        })
-    
-    conn.close()
-    
-    # Sort and mark best
-    recommendations.sort(key=lambda x: x['monetaryValue'], reverse=True)
-    if recommendations:
-        recommendations[0]['isBest'] = True
-        
-    return jsonify({"success": True, "recommendations": recommendations})
+# End of AI API
 
 if __name__ == '__main__':
 
