@@ -1105,25 +1105,25 @@ def predict_approval_endpoint():
 
 
 if __name__ == "__main__":
-    print("🔧 Initialising database…")
+    print("Initialising database...")
     run_migrations()
 
     # Seed if not already done
     from seed_data import seed
     from database import get_all_cards
     if len(get_all_cards()) == 0:
-        print("🌱 Seeding card data…")
+        print("Seeding card data...")
         seed()
 
     # Seed first rate snapshot if history is empty
     from downgrade_detector import get_latest_history
     if not get_latest_history():
-        print("📸 Seeding initial rate snapshot…")
+        print("Seeding initial rate snapshot...")
         write_snapshot(snapshot_current_rates())
 
     # Start APScheduler jobs
     init_scheduler()              # nightly reward expiry check
     init_downgrade_scheduler()    # weekly downgrade diff
 
-    print("🚀 CrediWise-AI backend starting on http://localhost:5001")
+    print("CrediWise-AI backend starting on http://localhost:5001")
     app.run(host="0.0.0.0", port=5001, debug=True, use_reloader=True)
