@@ -50,8 +50,20 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateProfile = async (userData) => {
+    try {
+      const res = await api.put('/auth/profile', userData);
+      const updatedUser = res.data.user;
+      localStorage.setItem('crediwise_user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      return { success: true };
+    } catch (err) {
+      return { success: false, message: err.response?.data?.message || 'Update failed' };
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, register, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

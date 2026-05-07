@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CardProvider } from './context/CardContext';
+import { UserProfileProvider } from './context/UserProfileContext';
 
 // ── Vault UI shell ──
 import VaultBackground from './components/VaultBackground';
@@ -29,6 +30,7 @@ import CommunityPage from './pages/CommunityPage';
 import ReportPage from './pages/ReportPage';
 import BoardroomPage from './pages/BoardroomPage';
 import OptimizerPage from './pages/OptimizerPage';
+import LifecyclePage from './pages/LifecyclePage';
 
 // ── Protected layout: sidebar + all app pages ──
 function ProtectedLayout() {
@@ -51,6 +53,7 @@ function ProtectedLayout() {
           <Route path="/report"     element={<ReportPage />} />
           <Route path="/boardroom"  element={<BoardroomPage />} />
           <Route path="/optimizer"  element={<OptimizerPage />} />
+          <Route path="/lifecycle"  element={<LifecyclePage />} />
 
           {/* Data management features (Node.js backend) */}
           <Route path="/cards"      element={<Instruments />} />
@@ -77,7 +80,8 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <CardProvider>
+      <UserProfileProvider>
+        <CardProvider>
         <VaultCursor />
         <VaultBackground />
         <VaultIntro onComplete={() => setIntroDone(true)} />
@@ -111,7 +115,8 @@ export default function App() {
             </Routes>
           </BrowserRouter>
         </div>
-      </CardProvider>
+        </CardProvider>
+      </UserProfileProvider>
     </AuthProvider>
   );
 }

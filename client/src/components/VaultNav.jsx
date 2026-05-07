@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   Home, ShieldCheck, Fingerprint, CreditCard,
   TrendingUp, Users, FileText, Wallet, Zap,
-  BarChart3, User, LogOut, MessageCircle, Target,
+  BarChart3, User, LogOut, MessageCircle, Target, Bell,
 } from 'lucide-react';
 
 const NAV_SECTIONS = [
@@ -19,7 +19,6 @@ const NAV_SECTIONS = [
     items: [
       { to: '/optimizer',  icon: Target,      label: 'Optimizer' },
       { to: '/audit',      icon: ShieldCheck, label: 'Audit' },
-      { to: '/persona',    icon: Fingerprint, label: 'Persona' },
       { to: '/approval',   icon: CreditCard,  label: 'Approval' },
       { to: '/boardroom',  icon: MessageCircle, label: 'AI Boardroom' },
     ],

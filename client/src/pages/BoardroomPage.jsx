@@ -16,15 +16,38 @@ export default function BoardroomPage() {
   const [question, setQuestion] = useState('')
   const [loading, setLoading] = useState(false)
   const [transcript, setTranscript] = useState([])
+  const [isLoaded, setIsLoaded] = useState(false)
   const chatEndRef = useRef(null)
   const toast = useToast()
+
+  // Load from localStorage on mount/user-change
+  useEffect(() => {
+    const key = `boardroom_transcript_${user?.id || 'anon'}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        setTranscript(JSON.parse(saved));
+      } catch (err) {
+        console.error('Failed to parse saved boardroom transcript', err);
+      }
+    } else {
+      setTranscript([]);
+    }
+    setIsLoaded(true);
+  }, [user?.id]);
 
   // Fetch expenses for context
   useEffect(() => {
     const fetchExpenses = async () => {
       try {
         const res = await api.get('/expenses');
-        setExpenses(res.data.monthly_spend || res.data.expenses || {});
+        const raw = res.data.expenses || [];
+        const aggregate = {};
+        raw.forEach(exp => {
+          const cat = (exp.category || 'other').toLowerCase();
+          aggregate[cat] = (aggregate[cat] || 0) + (Number(exp.amount) || 0);
+        });
+        setExpenses(aggregate);
       } catch (err) {
         console.error('Failed to fetch expenses for boardroom', err);
       }
@@ -38,7 +61,18 @@ export default function BoardroomPage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [transcript, loading])
+    // Persist to localStorage once loaded
+    if (isLoaded) {
+      localStorage.setItem(`boardroom_transcript_${user?.id || 'anon'}`, JSON.stringify(transcript));
+    }
+  }, [transcript, loading, isLoaded])
+
+  const clearChat = () => {
+    if (window.confirm('Clear all messages in the boardroom?')) {
+      setTranscript([]);
+      localStorage.removeItem(`boardroom_transcript_${user?.id || 'anon'}`);
+    }
+  }
 
   const handleSend = async (e) => {
     if (e) e.preventDefault()
@@ -83,6 +117,12 @@ export default function BoardroomPage() {
         <p className="vault-subtext">
           Summit of the Experts. Max, Sage, and Mint debate your next financial move.
         </p>
+        {transcript.length > 0 && (
+          <button onClick={clearChat} className="clear-chat-btn" title="Clear Boardroom">
+            <Trash2 size={16} />
+            <span>Reset Session</span>
+          </button>
+        )}
       </div>
 
       <div className="boardroom-container">
@@ -196,6 +236,19 @@ export default function BoardroomPage() {
           letter-spacing: 0.05em; margin: 0 0 4px;
         }
         .vault-subtext { font-family: var(--font-ui); font-weight: 300; font-size: 15px; color: var(--plat-cool); margin-bottom: 24px; }
+        
+        .clear-chat-btn {
+          display: flex; align-items: center; gap: 8px;
+          background: rgba(248, 113, 113, 0.05);
+          border: 1px solid rgba(248, 113, 113, 0.2);
+          color: var(--status-crit-fg);
+          padding: 6px 12px; border-radius: var(--radius-md);
+          font-family: var(--font-mono); font-size: 10px;
+          text-transform: uppercase; letter-spacing: 0.05em;
+          cursor: pointer; transition: all 200ms ease;
+          margin-bottom: 16px;
+        }
+        .clear-chat-btn:hover { background: rgba(248, 113, 113, 0.1); border-color: var(--status-crit-fg); }
 
         .boardroom-container {
           flex: 1;

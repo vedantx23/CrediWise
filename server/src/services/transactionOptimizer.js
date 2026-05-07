@@ -47,7 +47,8 @@ function optimizeTransaction({
   channel = 'online',
   merchant = '',
   monthlySpends = {},
-  cumulativeSpends = {}
+  cumulativeSpends = {},
+  userInstruments = []
 }) {
   const lowerMerchant = (merchant || '').toLowerCase();
   const lowerChannel = channel.toLowerCase();
@@ -72,6 +73,38 @@ function optimizeTransaction({
     let effectiveRate = card.base_reward_rate;
     let matchedAccelerator = null;
     let isExcluded = false;
+
+    // ── 0. Overlay User Context ──
+    // If the user has this card in their wallet, they might have custom rates/multipliers
+    const userInst = userInstruments.find(ui => {
+      const n1 = ui.name.toLowerCase().replace(/ credit card$/, '').trim();
+      const n2 = card.name.toLowerCase().replace(/ credit card$/, '').trim();
+      return n1 === n2;
+    });
+    if (userInst) {
+      // Use user's custom base rate if provided
+      effectiveRate = userInst.base_reward_rate || effectiveRate;
+
+      // Check for category multiplier in user's instrument settings
+      const multipliers = userInst.category_multipliers || {};
+      const catKey = category.toLowerCase();
+      // Try exact match or fuzzy match (e.g. "Food & Dining" -> "food")
+      let multiplier = 1;
+      if (multipliers instanceof Map) {
+        multiplier = multipliers.get(category) || multipliers.get(catKey) || 1;
+      } else {
+        multiplier = multipliers[category] || multipliers[catKey] || 1;
+      }
+
+      if (multiplier > 1) {
+        effectiveRate = effectiveRate * multiplier;
+        matchedAccelerator = {
+          channel: 'User Custom Setting',
+          rate_percent: effectiveRate,
+          description: `Custom ${multiplier}X multiplier for ${category} set in My Cards`
+        };
+      }
+    }
 
     // ── 1. Check Exclusions ──
     const exclusionMatch = card.exclusions.find(ex => {
@@ -176,8 +209,13 @@ function optimizeTransaction({
 
     // ── 6. Monthly Cap Check ──
     let capWarning = null;
-    if (card.monthly_caps.length > 0) {
-      for (const cap of card.monthly_caps) {
+    if (card.monthly_caps.length > 0 || (userInst && userInst.reward_cap)) {
+      const caps = [...card.monthly_caps];
+      if (userInst && userInst.reward_cap) {
+        caps.push({ cap_amount: userInst.reward_cap, description: "User-defined monthly cap" });
+      }
+
+      for (const cap of caps) {
         const spent = monthlySpends[card.name] || 0;
         if (cap.cap_amount) {
           const remainingCap = cap.cap_amount - spent * (effectiveRate / 100);
@@ -277,7 +315,7 @@ function buildExplanation(card, amount, effectiveRate, accelerator, isExcluded, 
 /**
  * Portfolio Audit — Compare user's cards against market leaders
  */
-function auditPortfolio({ userCards = [], monthlyProfile = {} }) {
+function auditPortfolio({ userCards = [], monthlyProfile = {}, userInstruments = [] }) {
   const portfolio = userCards
     .map(name => CARD_DIRECTORY.find(c => c.name === name))
     .filter(Boolean);
@@ -298,6 +336,20 @@ function auditPortfolio({ userCards = [], monthlyProfile = {} }) {
     // Best in portfolio
     const portfolioResults = portfolio.map(card => {
       let rate = card.base_reward_rate;
+      
+      // Overlay user context
+      const userInst = userInstruments.find(ui => {
+        const n1 = ui.name.toLowerCase().replace(/ credit card$/, '').trim();
+        const n2 = card.name.toLowerCase().replace(/ credit card$/, '').trim();
+        return n1 === n2;
+      });
+      if (userInst) {
+        rate = userInst.base_reward_rate || rate;
+        const multipliers = userInst.category_multipliers || {};
+        const mult = (multipliers instanceof Map) ? (multipliers.get(category) || 1) : (multipliers[category] || 1);
+        rate = rate * mult;
+      }
+
       const match = card.accelerated_rewards.find(a =>
         a.channel.toLowerCase().includes(channel.toLowerCase()) ||
         a.channel.toLowerCase().includes(category.toLowerCase()) ||

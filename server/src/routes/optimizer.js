@@ -1,8 +1,10 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const { optimizeTransaction, auditPortfolio, getCardDirectory } = require('../services/transactionOptimizer');
+const InstrumentRepository = require('../repositories/InstrumentRepository');
 
 const router = express.Router();
+router.use(authMiddleware);
 
 // GET /api/optimizer/cards — List all available cards in the directory
 router.get('/cards', (req, res) => {
@@ -31,6 +33,9 @@ router.post('/recommend', async (req, res) => {
   }
 
   try {
+    // Fetch user's actual instruments for context (multipliers, caps)
+    const userInstruments = await InstrumentRepository.findAllByUserId(req.user.id);
+
     const result = optimizeTransaction({
       userCards,
       amount: Number(amount),
@@ -38,7 +43,8 @@ router.post('/recommend', async (req, res) => {
       channel: channel || 'online',
       merchant: merchant || '',
       monthlySpends: monthlySpends || {},
-      cumulativeSpends: cumulativeSpends || {}
+      cumulativeSpends: cumulativeSpends || {},
+      userInstruments // Pass the context
     });
     res.json(result);
   } catch (err) {
@@ -60,7 +66,8 @@ router.post('/audit', async (req, res) => {
   }
 
   try {
-    const result = auditPortfolio({ userCards, monthlyProfile });
+    const userInstruments = await InstrumentRepository.findAllByUserId(req.user.id);
+    const result = auditPortfolio({ userCards, monthlyProfile, userInstruments });
     res.json(result);
   } catch (err) {
     console.error('Audit error:', err);
