@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import api from '../api'
 import VaultCard from '../components/VaultCard'
 import { VaultButton, VaultInput } from '../components/VaultForms'
-import SpendDial from '../components/SpendDial'
 import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
 import { useToast } from '../components/VaultToast'
 import { inr } from '../utils/format'
@@ -212,9 +211,6 @@ export default function AuditPage() {
             </form>
           </VaultCard>
 
-          <VaultCard style={{ marginTop: 16, display:'flex', justifyContent:'center' }}>
-            <SpendDial totalMonthlySpend={totalSpend} effectiveRate={effectiveRate} />
-          </VaultCard>
         </div>
 
         {/* ── Right: Result ── */}

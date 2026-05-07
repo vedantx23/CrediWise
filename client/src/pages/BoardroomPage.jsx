@@ -24,7 +24,13 @@ export default function BoardroomPage() {
     const fetchExpenses = async () => {
       try {
         const res = await api.get('/expenses');
-        setExpenses(res.data.monthly_spend || res.data.expenses || {});
+        const raw = res.data.expenses || [];
+        const aggregate = {};
+        raw.forEach(exp => {
+          const cat = (exp.category || 'other').toLowerCase();
+          aggregate[cat] = (aggregate[cat] || 0) + (Number(exp.amount) || 0);
+        });
+        setExpenses(aggregate);
       } catch (err) {
         console.error('Failed to fetch expenses for boardroom', err);
       }

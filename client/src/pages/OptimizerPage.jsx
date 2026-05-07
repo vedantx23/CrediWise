@@ -28,33 +28,54 @@ export default function OptimizerPage() {
   const [recommendations, setRecommendations] = useState(null);
 
   useEffect(() => {
-    fetchCards();
-    fetchMyWallet();
+    const init = async () => {
+      const cards = await fetchCards();
+      if (cards) await fetchMyWallet(cards);
+    };
+    init();
   }, []);
 
   async function fetchCards() {
     try {
       const res = await api.get('/optimizer/cards');
       setAllCards(res.data.cards);
+      return res.data.cards;
     } catch (err) {
       console.error('Failed to fetch cards', err);
+      return null;
     }
   }
 
-  async function fetchMyWallet() {
+  async function fetchMyWallet(loadedCards) {
     try {
       const res = await api.get('/instruments');
-      const walletNames = (res.data.instruments || []).map(i => i.name);
-      setMyWalletCards(walletNames);
-      setSelectedCards(walletNames);
+      const rawNames = (res.data.instruments || []).map(i => i.name);
+      setMyWalletCards(rawNames);
+      
+      const cardsToUse = loadedCards || allCards;
+      
+      // Auto-select wallet cards using standardized directory names
+      const initialSelected = rawNames.map(name => {
+        const std = name.toLowerCase().replace(/ credit card$/, '').trim();
+        const full = cardsToUse.find(c => c.name.toLowerCase().replace(/ credit card$/, '').trim() === std);
+        return full ? full.name : name;
+      });
+      setSelectedCards(initialSelected);
     } catch (err) {
       console.error('Failed to fetch wallet instruments', err);
     }
   }
 
+  const standardize = (name) => name.toLowerCase().replace(/ credit card$/, '').trim();
+
   function toggleCard(name) {
+    const stdName = standardize(name);
+    // Find the full name from allCards to keep it standardized
+    const fullCard = allCards.find(c => standardize(c.name) === stdName);
+    const targetName = fullCard ? fullCard.name : name;
+
     setSelectedCards(prev =>
-      prev.includes(name) ? prev.filter(c => c !== name) : [...prev, name]
+      prev.includes(targetName) ? prev.filter(c => c !== targetName) : [...prev, targetName]
     );
   }
 
@@ -87,18 +108,22 @@ export default function OptimizerPage() {
 
       {/* Card Selection */}
       <div className="card-selection">
-        <h3>Your Wallet Cards ({selectedCards.length} selected)</h3>
+        <h3>Selected Cards ({selectedCards.length})</h3>
         {myWalletCards.length > 0 ? (
           <div className="card-grid">
             {myWalletCards.map(name => {
-              const card = allCards.find(c => c.name === name);
+              const stdName = standardize(name);
+              const card = allCards.find(c => standardize(c.name) === stdName);
+              const fullName = card ? card.name : name;
+              const isSelected = selectedCards.includes(fullName);
+
               return (
                 <button
                   key={name}
-                  className={`card-chip ${selectedCards.includes(name) ? 'selected' : ''}`}
+                  className={`card-chip ${isSelected ? 'selected' : ''}`}
                   onClick={() => toggleCard(name)}
                 >
-                  <span className="chip-bank">{card?.bank || '—'}</span>
+                  <span className="chip-bank">{card?.bank || 'WALLET'}</span>
                   <span className="chip-name">{name.replace(/ Credit Card$/, '')}</span>
                   {card?.has_upi_benefits && <span className="upi-badge">UPI</span>}
                   <span className="wallet-badge">WALLET</span>
@@ -121,7 +146,7 @@ export default function OptimizerPage() {
 
         {showDirectory && (
           <div className="card-grid directory-grid">
-            {allCards.filter(c => !myWalletCards.includes(c.name)).map(card => (
+            {allCards.filter(c => !myWalletCards.some(m => standardize(m) === standardize(c.name))).map(card => (
               <button
                 key={card.name}
                 className={`card-chip ${selectedCards.includes(card.name) ? 'selected' : ''}`}
