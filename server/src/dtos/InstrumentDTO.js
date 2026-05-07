@@ -1,7 +1,7 @@
 class InstrumentDTO {
   constructor(instrument) {
-    this.id = instrument._id;
-    this.user_id = instrument.user_id;
+    this.id = instrument._id.toString();
+    this.user_id = instrument.user_id.toString();
     this.name = instrument.name;
     this.type = instrument.type;
     this.base_reward_rate = instrument.base_reward_rate;

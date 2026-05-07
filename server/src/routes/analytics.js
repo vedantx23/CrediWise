@@ -94,7 +94,9 @@ router.get('/summary', async (req, res) => {
 
       let rawRewards = 0;
       categoryExpenses.forEach(exp => {
-        const mult = multipliers.get(exp._id) || 1;
+        const mult = (inst.category_multipliers instanceof Map) 
+          ? (inst.category_multipliers.get(exp._id) || 1)
+          : (inst.category_multipliers?.[exp._id] || 1);
         rawRewards += exp.total * (inst.base_reward_rate / 100) * mult;
       });
 

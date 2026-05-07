@@ -1,6 +1,49 @@
-node_modules
-dist
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+dist/
+*.egg-info/
+*.egg
+
+# ML/Data
+models/*.pkl
+models/*.h5
+.ipynb_checkpoints
+
+# Environment/Secrets
 .env
+.venv
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+**/node_modules/
+**/dist/
+*.local
+
+# SQLite (legacy)
 *.db
 *.sqlite
-.DS_Store
+*.db-shm
+*.db-wal
+
+# IDE
+.idea/
+.vscode/
+
+# Generated
+backend/memory/
+backend/reports/
+backend/models/*.pkl
+
+# Logs
+*.log
