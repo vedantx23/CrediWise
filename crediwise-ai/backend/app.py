@@ -4,7 +4,7 @@ All routes return: {success: bool, data: {}, error: str}
 """
 
 from __future__ import annotations
-import os, sys, json, uuid
+import os, sys, json, uuid, logging
 from pathlib import Path
 
 from flask import Flask, request, jsonify
@@ -34,12 +34,27 @@ from community import (
     submit_combo, get_leaderboard, get_all_combos_for_city, get_combo,
     PERSONAS, INDIAN_CITIES,
 )
+from database import query as db_query
 from report_generator import generate_report
 from approval_predictor import predict_approval, train_and_save as train_approval
+from recommendation_engine import RecommendationEngine
 
 # ─── App setup ───────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True)
+
+# ─── Debug mode ──────────────────────────────────────────────────────────────
+# Enable verbose logging by setting CREDIWISE_DEBUG=1 in the environment.
+DEBUG_MODE = os.environ.get("CREDIWISE_DEBUG", "").lower() in {"1", "true", "yes"}
+_log_level = logging.DEBUG if DEBUG_MODE else logging.INFO
+logging.basicConfig(
+    level=_log_level,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
+app.logger.setLevel(_log_level)
+logger = logging.getLogger(__name__)
+if DEBUG_MODE:
+    app.logger.info("🐛 CREDIWISE_DEBUG is ON — verbose logs enabled")
 
 BASE_DIR   = Path(__file__).resolve().parent
 MEMORY_DIR = BASE_DIR / "memory"
@@ -138,8 +153,79 @@ def audit():
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-#  FEATURE 2 — PERSONA ENGINE
+#  FEATURE 1B — UNIFIED RECOMMENDATION ENGINE (audit + approval + persona)
 # ═══════════════════════════════════════════════════════════════════════════════
+
+@app.post("/api/recommend")
+def recommend_endpoint():
+    """
+    POST /api/recommend
+    Body (JSON):
+    {
+      "monthly_spend": {category: amount, ...},
+      "current_cards": [card_id, ...],
+      "income_annual": float,
+      "cibil_score":   int,
+      "k":             int (optional, default 3)
+    }
+    Returns the unified RecommendationEngine result
+    (audit + persona + approval-adjusted top-k).
+    """
+    body = request.get_json(silent=True) or {}
+    spend = body.get("monthly_spend") or {}
+    if not isinstance(spend, dict):
+        return err("monthly_spend must be a dict.")
+
+    user_profile = {
+        "monthly_spend":  {k: float(v or 0) for k, v in spend.items()},
+        "current_cards":  body.get("current_cards") or [],
+        "income_annual":  float(body.get("income_annual", 0)),
+        "cibil_score":    int(body.get("cibil_score", 700)),
+    }
+    k = max(1, min(int(body.get("k", 3)), 10))
+
+    try:
+        result = RecommendationEngine().recommend(user_profile, k=k)
+    except Exception as e:
+        app.logger.exception("Recommendation engine error")
+        return err(f"Recommendation failed: {str(e)}", 500)
+    return ok(result)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  LIFECYCLE AGGREGATE — downgrade alerts + reward expiries (single endpoint)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@app.get("/api/lifecycle/<user_id>")
+def lifecycle_summary(user_id: str):
+    """
+    GET /api/lifecycle/{user_id}
+    Aggregates the three lifecycle subsystems for the dashboard:
+      - downgrade_alerts (active, unacknowledged)
+      - reward_expiries  (next 30 days)
+    """
+    try:
+        alerts = get_active_alerts(None)
+    except Exception:
+        alerts = []
+    try:
+        expiries = get_user_expiries(user_id)
+    except Exception:
+        expiries = []
+
+    expiring_soon = [
+        e for e in (expiries or [])
+        if isinstance(e, dict) and (e.get("days_until_expiry") or 999) <= 30
+    ]
+
+    return ok({
+        "user_id":            user_id,
+        "downgrade_alerts":   alerts,
+        "downgrade_count":    len(alerts),
+        "reward_expiries":    expiries,
+        "expiring_soon":      expiring_soon,
+        "expiring_soon_count": len(expiring_soon),
+    })
 
 @app.post("/api/persona")
 def persona():
@@ -186,6 +272,13 @@ def persona():
     cibil         = int(body.get("cibil_score", 700))
 
     try:
+        if app.logger.isEnabledFor(logging.DEBUG):
+            app.logger.debug(
+                "[persona] inputs: spend_keys=%s total=%.0f income=%.0f cibil=%s cards=%s",
+                list(monthly_spend.keys()),
+                sum(float(v or 0) for v in monthly_spend.values()),
+                income, cibil, cards_count,
+            )
         result = predict_persona(
             monthly_spend  = monthly_spend,
             income_annual  = income,
@@ -194,10 +287,29 @@ def persona():
             cibil_score    = cibil,
         )
     except FileNotFoundError as e:
+        app.logger.error("[persona] model file missing: %s", e)
         return err(str(e), 503)
     except Exception as e:
         app.logger.exception("Persona engine error")
         return err(f"Persona prediction failed: {str(e)}", 500)
+
+    # Backward-compatible aliases so older frontend code that reads
+    # `result.persona` keeps working alongside `result.persona_name`.
+    if isinstance(result, dict):
+        result.setdefault("persona", result.get("persona_name"))
+        result.setdefault("features_used", {
+            "monthly_spend":  monthly_spend,
+            "income_annual":  income,
+            "cibil_score":    cibil,
+            "cards_count":    cards_count,
+            "total_spend":    sum(float(v or 0) for v in monthly_spend.values()),
+        })
+
+    if app.logger.isEnabledFor(logging.DEBUG):
+        app.logger.debug(
+            "[persona] output: persona=%s confidence=%.3f",
+            result.get("persona_name"), float(result.get("confidence", 0)),
+        )
 
     return ok(result)
 
@@ -842,10 +954,15 @@ def leaderboard():
 @app.get("/api/leaderboard/cities")
 def leaderboard_cities():
     """GET /api/leaderboard/cities — list of available cities in combos DB."""
-    rows = query(
-        "SELECT DISTINCT city, COUNT(*) as combos FROM card_combos "
-        "WHERE city IS NOT NULL GROUP BY city ORDER BY combos DESC"
-    )
+    try:
+        rows = db_query(
+            "SELECT DISTINCT city, COUNT(*) as combos FROM card_combos "
+            "WHERE city IS NOT NULL GROUP BY city ORDER BY combos DESC"
+        )
+    except Exception as e:
+        # Table missing or DB unavailable — degrade gracefully.
+        logger.warning("[leaderboard/cities] DB query failed: %s", e)
+        rows = []
     return ok({
         "cities":         [r["city"] for r in rows],
         "all_cities":     INDIAN_CITIES,

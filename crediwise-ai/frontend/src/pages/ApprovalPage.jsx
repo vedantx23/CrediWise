@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import api from '../api'
 import { inr as formatINR } from '../utils/format'
+import { useUserProfile } from '../context/UserProfileContext'
 
 const TIERS = {
   high:   { color: 'text-green-400',  bar: 'bg-green-500',  label: 'High' },
@@ -9,24 +10,41 @@ const TIERS = {
 }
 
 export default function ApprovalPage() {
+  const { profile, updateProfile } = useUserProfile()
   const [form, setForm] = useState({
-    cibil_score: '',
-    income_annual: '',
-    existing_cards_count: '0',
+    cibil_score:           profile.cibil_score ?? '',
+    income_annual:         profile.income_annual ?? '',
+    existing_cards_count:  String((profile.current_cards || []).length || 0),
   })
   const [results, setResults]   = useState(null)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
 
-  const handleChange = e =>
-    setForm(f => ({ ...f, [e.target.name]: e.target.value }))
+  // Re-sync if user updates profile elsewhere (Audit / Persona pages).
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      cibil_score:   profile.cibil_score ?? f.cibil_score,
+      income_annual: profile.income_annual ?? f.income_annual,
+      existing_cards_count:
+        String((profile.current_cards || []).length || f.existing_cards_count || 0),
+    }))
+  }, [profile.cibil_score, profile.income_annual, profile.current_cards])
+
+  const handleChange = e => {
+    const { name, value } = e.target
+    setForm(f => ({ ...f, [name]: value }))
+    if (name === 'cibil_score' || name === 'income_annual') {
+      updateProfile({ [name]: value })
+    }
+  }
 
   const submit = async e => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/api/predict-approval', {
+      const res = await api.post('/predict-approval', {
         cibil_score:           Number(form.cibil_score),
         income_annual:         Number(form.income_annual),
         existing_cards_count:  Number(form.existing_cards_count),

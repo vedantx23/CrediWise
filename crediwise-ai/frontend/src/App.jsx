@@ -12,6 +12,8 @@ import SimulatorPage from './pages/SimulatorPage'
 import CommunityPage from './pages/CommunityPage'
 import ApprovalPage  from './pages/ApprovalPage'
 import ReportPage    from './pages/ReportPage'
+import BoardroomPage from './pages/BoardroomPage'
+import LifecyclePage from './pages/LifecyclePage'
 
 export default function App() {
   return (
@@ -34,6 +36,8 @@ export default function App() {
           <Route path="/community"  element={<CommunityPage />} />
           <Route path="/approval"   element={<ApprovalPage />} />
           <Route path="/report"     element={<ReportPage />} />
+          <Route path="/boardroom"  element={<BoardroomPage />} />
+          <Route path="/lifecycle"  element={<LifecyclePage />} />
         </Routes>
       </main>
     </ToastProvider>

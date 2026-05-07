@@ -13,12 +13,14 @@ SHAP:   TreeExplainer for feature attribution on every prediction
 """
 
 from __future__ import annotations
-import os, sys, json, pickle
+import os, sys, json, pickle, logging
 import numpy as np
 import pandas as pd
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+logger = logging.getLogger(__name__)
 
 # ─── Persona definitions ──────────────────────────────────────────────────────
 
@@ -290,10 +292,26 @@ def train_and_save(n_per_class: int = 1200) -> dict:
     # Evaluate
     cv_scores = cross_val_score(clf, X, y, cv=5, scoring="accuracy")
     test_acc  = clf.score(X_test, y_test)
-    report    = classification_report(y_test, clf.predict(X_test), output_dict=True)
+    y_pred    = clf.predict(X_test)
+    report    = classification_report(y_test, y_pred, output_dict=True)
+
+    from sklearn.metrics import confusion_matrix
+    cm = confusion_matrix(y_test, y_pred)
 
     print(f"  ✓ CV accuracy : {cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
     print(f"  ✓ Test accuracy: {test_acc:.3f}")
+    print(f"  ✓ Confusion matrix (rows=true, cols=pred):")
+    persona_names = [PERSONAS[i]["name"] for i in range(4)]
+    print("     " + " ".join(f"{n[:14]:>14}" for n in persona_names))
+    for i, row in enumerate(cm):
+        print(f"     {persona_names[i][:14]:>14} " + " ".join(f"{v:>14}" for v in row))
+    print(f"  ✓ Top features by importance:")
+    importances = sorted(
+        zip(FEATURES, clf.feature_importances_),
+        key=lambda kv: kv[1], reverse=True,
+    )
+    for f, w in importances[:6]:
+        print(f"     {f:<22} {w:.4f}")
 
     # Save
     MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -319,12 +337,17 @@ def train_and_save(n_per_class: int = 1200) -> dict:
 
 def _load_model() -> dict:
     if not MODEL_PATH.exists():
+        logger.warning("[persona] model file missing: %s", MODEL_PATH)
         raise FileNotFoundError(
             f"Persona model not found at {MODEL_PATH}. "
             "Run: python backend/persona_engine.py"
         )
-    with open(MODEL_PATH, "rb") as f:
-        return pickle.load(f)
+    try:
+        with open(MODEL_PATH, "rb") as f:
+            return pickle.load(f)
+    except Exception as e:
+        logger.exception("[persona] failed to unpickle model: %s", e)
+        raise
 
 
 def _shap_explain(clf, X: np.ndarray, predicted_class: int) -> dict[str, float]:
@@ -379,27 +402,38 @@ def _persona_card_recs(
     cards_meta = {c["card_id"]: c for c in get_all_cards()}
     all_rewards = get_all_rewards_map()
 
-    # Score each recommendation by persona fit
+    # Score each recommendation by persona fit.
+    # Strategy: heavily weight persona-fit so it can flip rankings instead of
+    # being lost in noise next to ₹-denominated marginal_nav.
     scored = []
     for rec in recs:
         cid  = rec["card_id"]
         meta = cards_meta.get(cid, {})
 
-        # Persona-fit bonus
-        bonus = 0
+        # Persona-fit MULTIPLIER (not additive). A card that is on the persona's
+        # ideal list gets a 1.6x boost; one matching its preferred categories
+        # gets uplift proportional to how much of its NAV comes from those cats.
+        multiplier = 1.0
         if cid in ideal_ids:
-            bonus += 30
+            multiplier *= 1.6
         if req_lounge and (meta.get("lounge_domestic", 0) or meta.get("lounge_intl", 0)):
-            bonus += 20
+            multiplier *= 1.25
         if req_free and meta.get("is_lifetime_free", 0):
-            bonus += 25
+            multiplier *= 1.3
 
-        # Bonus for performing well in persona's preferred categories
+        # Share of marginal NAV coming from preferred categories
         shap = rec.get("shap_values", {})
-        pref_shap = sum(shap.get(cat, 0) for cat in preferred)
-        bonus += pref_shap / 1000.0   # scale down for mixing
+        total_shap = sum(shap.values()) or 1.0
+        pref_share = sum(shap.get(cat, 0) for cat in preferred) / total_shap
+        # Up to +50% bonus if 100% of value is in preferred categories
+        multiplier *= (1.0 + 0.5 * pref_share)
 
-        scored.append({**rec, "persona_score": rec["marginal_nav"] + bonus})
+        # Penalize cards whose value comes mainly from non-preferred categories
+        # for personas with explicit preferences.
+        if preferred and pref_share < 0.2:
+            multiplier *= 0.5
+
+        scored.append({**rec, "persona_score": rec["marginal_nav"] * multiplier})
 
     scored.sort(key=lambda x: x["persona_score"], reverse=True)
 
@@ -455,12 +489,70 @@ def predict_persona(
     bundle = _load_model()
     clf    = bundle["model"]
 
-    X          = extract_features(monthly_spend, income_annual, cards_count)
-    pred       = int(clf.predict(X)[0])
-    proba      = clf.predict_proba(X)[0]
+    # ── Input validation + coercion ──────────────────────────────────────────
+    if not isinstance(monthly_spend, dict):
+        raise ValueError("monthly_spend must be a dict of {category: number}")
+
+    safe_spend = {}
+    for cat in CATEGORIES:
+        v = monthly_spend.get(cat, 0)
+        try:
+            safe_spend[cat] = max(0.0, float(v or 0))
+        except (TypeError, ValueError):
+            logger.warning("[persona] non-numeric spend for %s=%r → 0", cat, v)
+            safe_spend[cat] = 0.0
+
+    try:
+        income_annual = max(0.0, float(income_annual or 0))
+    except (TypeError, ValueError):
+        income_annual = 0.0
+    try:
+        cards_count = max(0, int(cards_count or 0))
+    except (TypeError, ValueError):
+        cards_count = 0
+
+    total = sum(safe_spend.values())
+    logger.debug("[persona] sanitised inputs total=%.0f income=%.0f cards=%d",
+                 total, income_annual, cards_count)
+
+    if total <= 0:
+        # Refuse to classify garbage — return a safe, explicit fallback.
+        logger.warning("[persona] zero total spend — returning fallback persona")
+        return {
+            "persona_id":    -1,
+            "persona_name":  "Unclassified",
+            "persona":       "Unclassified",
+            "persona_emoji": "❓",
+            "tagline":       "Add some monthly spend to discover your persona.",
+            "description":   "We need at least one non-zero category to classify you.",
+            "traits":        [],
+            "confidence":    0.0,
+            "probabilities": {},
+            "shap_drivers":  {},
+            "top_drivers":   [],
+            "recommendations": [],
+            "features_used": {
+                "monthly_spend": safe_spend,
+                "income_annual": income_annual,
+                "cards_count":   cards_count,
+                "total_spend":   total,
+            },
+            "fallback":      True,
+        }
+
+    X = extract_features(safe_spend, income_annual, cards_count)
+    logger.debug("[persona] feature vector shape=%s", X.shape)
+
+    try:
+        pred  = int(clf.predict(X)[0])
+        proba = clf.predict_proba(X)[0]
+    except Exception as e:
+        logger.exception("[persona] model.predict failed — using rule-based fallback")
+        pred, proba = _rule_based_persona(safe_spend, total)
 
     persona    = PERSONAS[pred]
     confidence = float(proba[pred])
+    logger.info("[persona] → %s (conf=%.3f)", persona["name"], confidence)
 
     # SHAP explanation
     shap_map  = _shap_explain(clf, X, pred)
@@ -468,7 +560,7 @@ def predict_persona(
 
     # Card recommendations
     user_profile = {
-        "monthly_spend":  monthly_spend,
+        "monthly_spend":  safe_spend,
         "current_cards":  current_cards or [],
         "income_annual":  income_annual,
         "cibil_score":    cibil_score,
@@ -478,6 +570,8 @@ def predict_persona(
     return {
         "persona_id":    pred,
         "persona_name":  persona["name"],
+        # Backward-compat alias for frontend code that reads `result.persona`
+        "persona":       persona["name"],
         "persona_emoji": persona["emoji"],
         "tagline":       persona["tagline"],
         "description":   persona["description"],
@@ -490,7 +584,38 @@ def predict_persona(
         "shap_drivers":  shap_map,
         "top_drivers":   top_drv,
         "recommendations": recs,
+        "features_used": {
+            "monthly_spend": safe_spend,
+            "income_annual": income_annual,
+            "cards_count":   cards_count,
+            "total_spend":   total,
+            "spend_entropy": float(_spend_entropy([safe_spend[c] / total for c in CATEGORIES])),
+        },
     }
+
+
+# ─── Rule-based fallback (used if model is missing or crashes) ───────────────
+
+def _rule_based_persona(spend: dict[str, float], total: float):
+    """
+    Heuristic classifier used when the trained model can't run.
+    Returns (predicted_class_int, proba_array_4).
+    """
+    fracs = {c: spend[c] / total for c in CATEGORIES}
+    travel_share = fracs["travel"] + fracs["international"]
+    luxury_share = fracs["dining"] + fracs["online"]
+
+    proba = np.array([0.25, 0.25, 0.25, 0.25])
+    if travel_share > 0.35:
+        proba = np.array([0.55, 0.20, 0.15, 0.10])    # Stealth Nomad
+    elif luxury_share > 0.45 and total > 30_000:
+        proba = np.array([0.10, 0.55, 0.20, 0.15])    # High-Street Architect
+    elif total < 15_000:
+        proba = np.array([0.10, 0.15, 0.20, 0.55])    # Frugal Zen Master
+    else:
+        proba = np.array([0.15, 0.20, 0.50, 0.15])    # Reward Arbitrageur
+
+    return int(np.argmax(proba)), proba
 
 
 # ─── CLI entry ────────────────────────────────────────────────────────────────

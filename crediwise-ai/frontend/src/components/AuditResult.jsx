@@ -12,7 +12,10 @@ const CAT_ICONS = {
 
 export default function AuditResult({ result }) {
   const { current_nav_annual, optimal_nav_annual, leakage_inr,
-          status, message, recommendations, spend_breakdown, current_cards } = result
+          status, message, recommendations, spend_breakdown, current_cards,
+          split_plays = [] } = result
+
+  const isUnaudited = status === 'unaudited'
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -24,19 +27,23 @@ export default function AuditResult({ result }) {
             <div className="flex items-center gap-2 mb-2">
               <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5
                                rounded-full border ${statusBg(status)}`}>
-                {status === 'pass' ? '✓ OPTIMISED' : status === 'warning' ? '⚠ WARNING' : '🔴 CRITICAL'}
+                {isUnaudited ? '◌ UNAUDITED'
+                  : status === 'pass' ? '✓ OPTIMISED'
+                  : status === 'warning' ? '⚠ WARNING' : '🔴 CRITICAL'}
               </span>
             </div>
             <p className={`text-2xl font-bold font-mono ${statusClass(status)}`}>
               {message}
             </p>
           </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-vault-muted text-xs mb-1">Annual leakage</p>
-            <p className={`font-mono text-4xl font-black ${statusClass(status)}`}>
-              {inr(leakage_inr)}
-            </p>
-          </div>
+          {!isUnaudited && (
+            <div className="text-right flex-shrink-0">
+              <p className="text-vault-muted text-xs mb-1">Annual leakage</p>
+              <p className={`font-mono text-4xl font-black ${statusClass(status)}`}>
+                {inr(leakage_inr)}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -102,6 +109,39 @@ export default function AuditResult({ result }) {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Split Plays ────────────────────────────────────────────────────── */}
+      {split_plays.length > 0 && (
+        <div className="glass rounded-xl border border-vault-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-vault-border">
+            <h3 className="text-sm font-semibold text-vault-text">🎴 Split Play strategy</h3>
+            <p className="text-xs text-vault-muted">Mix-and-match cards to maximize per-category rewards</p>
+          </div>
+          <div className="divide-y divide-vault-border/50">
+            {split_plays.map(p => (
+              <div key={p.card_id} className="px-4 py-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-vault-text">
+                    Use <span className="text-vault-gold">{p.card_name}</span> for{' '}
+                    {p.categories.map(c => c.category).join(', ')}
+                  </span>
+                  <span className="text-emerald-400 font-mono text-xs font-bold">
+                    +{inrShort(p.extra_annual_inr)}/yr
+                  </span>
+                </div>
+                <ul className="text-xs text-vault-muted space-y-0.5 ml-2">
+                  {p.categories.map(c => (
+                    <li key={c.category}>
+                      • <span className="capitalize">{c.category}</span>: {pct(c.current_rate_pct)} → <span className="text-vault-gold">{pct(c.optimal_rate_pct)}</span>{' '}
+                      (+{inrShort(c.extra_inr)}/yr)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
       )}

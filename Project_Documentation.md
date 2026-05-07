@@ -5,24 +5,33 @@
 *   **The Solution:** CrediWise is an AI-driven, personalized credit card recommendation platform. It calculates the realistic financial value of a card based on a user’s unique spending habits, income, and lifestyle preferences.
 *   **Target Users:** Indian consumers looking to maximize their credit card rewards, travel benefits, and net annual value without manually running complex calculations.
 
-## 2. Key Features
-*   **Hyper-Personalized Matching:** Recommends cards based on precise spending allocations (e.g., travel, dining, e-commerce, general) rather than generic labels.
-*   **AI Chat Advisor:** A locally-hosted AI assistant that answers specific user questions about card benefits, eligibility, and direct comparisons using factual platform data.
-*   **Intelligent Data Sanitization Pipeline:** Automatically parses complex textual definitions of "rewards" and "fee waivers" into clean, comparable mathematical data points.
-*   **Dynamic Valuation:** Calculates the "Net Annual Value" factoring in expected rewards, joining/annual fees, and fee-waiver thresholds based on projected spends.
+## 2. AI Intelligence Layer (Python/Flask Service)
+*   **Persona Engine:**
+    *   *Logic:* A Random Forest classifier that analyzes spending across 7 categories: Dining, Fuel, Grocery, Travel, Online, Utilities, International.
+    *   *Archetypes:* Predicts one of four personas: The Stealth Nomad, The High-Street Architect, The Reward Arbitrageur, The Frugal Zen Master.
+*   **Shadow Audit System:**
+    *   *NAV Logic:* Calculates Net Asset Value (NAV) by mapping spending categories to the highest available reward rates in the portfolio.
+    *   *Leakage Analysis:* Compares the user's current NAV against an "Optimal NAV" (using the best cards in the market) to calculate "Reward Leakage" (lost savings).
+    *   *Explainability:* Uses SHAP-like logic to explain why a specific card is recommended (e.g., "Boosts travel rewards by 4.2%").
 
-## 3. Tech Stack
-*   **Frontend:** HTML5, CSS3, Vanilla JavaScript (Single Page Architecture).
-*   **Backend & APIs:** Python 3, FastAPI.
+## 3. Functional Features & Endpoints
+*   **Dashboard Oracle:** A central hub showing Portfolio Health, Reward Distribution, and the "Spending Archetype" card.
+*   **Instrument Vault:** A secure interface to add and manage multiple credit cards and bank accounts.
+*   **Intelligent Recommendations:** A sidebar that ranks cards based on the specific INR value they would add to the user's current spending pattern.
+*   **Expense Analytics:** Automated categorization of transactions into the 7 core reward categories.
+
+## 4. Tech Stack
+*   **Frontend:** React, Vite, CSS3 (Single Page Architecture).
+*   **Backend & APIs:** Python 3, Flask.
 *   **Data Processing & Engineering:** Pandas, NumPy, Scikit-learn (KNNImputer, MultiLabelBinarizer, StandardScaler).
 *   **AI & Machine Learning:** Ollama (serving the `llama3.2:3b` LLM model locally) for RAG capabilities, Multi-Criteria Decision Analysis (MCDA) algorithms (e.g., TOPSIS) for ranking.
 *   **Data Storage:** CSV-based tabular data sets acting as a lightweight, read-optimized database.
 
-## 4. System Architecture
+## 5. System Architecture
 *   **Phase 1 (Data Acquisition):** Python scraping scripts fetch real-time card data from the web.
 *   **Phase 2 (Data Pipeline):** The raw data is passed through `CrediWiseDataPipeline` which standardizes text, extracts Indian currency values/milestones, scales features, and resolves partner merchants.
 *   **Phase 3 (Decision Engine):** Machine learning components formulate predictive models, storing weights as artifacts to enable fast inference.
-*   **Phase 4 (API & Frontend):** The FastAPI instance serves the pre-calculated recommendations and bridges the RAG chatbot with the dataset and the user interface.
+*   **Phase 4 (API & Frontend):** The Flask instance serves the pre-calculated recommendations and bridges the RAG chatbot with the dataset and the user interface.
 
 ## 5. Database Design
 Instead of a traditional relational database, the project utilizes structured datasets optimized for fast data-science operations:

@@ -60,7 +60,7 @@ function MarriageForm({ onResult }) {
   const submit = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post("/api/simulate", {
+      const { data } = await api.post("/simulate", {
         event: "marriage",
         profile_a: {
           monthly_spend: spendA, income_annual: +incomeA, cibil_score: +cibilA,
@@ -119,7 +119,7 @@ function SalaryHikeForm({ onResult }) {
   const submit = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post("/api/simulate", {
+      const { data } = await api.post("/simulate", {
         event: "salary_hike",
         monthly_spend:  spend,
         current_income: +curIncome,
@@ -177,7 +177,7 @@ function EMIForm({ onResult }) {
   const submit = async () => {
     setLoading(true);
     try {
-      const { data } = await api.post("/api/simulate", {
+      const { data } = await api.post("/simulate", {
         event:           "emi_purchase",
         purchase_amount: +amount,
         emi_months:      +months,

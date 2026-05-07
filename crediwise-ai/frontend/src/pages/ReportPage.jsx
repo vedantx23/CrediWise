@@ -60,7 +60,7 @@ export default function ReportPage() {
           : [],
       }
 
-      const res = await api.post('/api/generate-report', body, {
+      const res = await api.post('/generate-report', body, {
         responseType: 'blob',
         params: { user_id: body.user_id, year },
       })

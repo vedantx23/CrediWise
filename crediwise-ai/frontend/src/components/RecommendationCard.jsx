@@ -47,13 +47,40 @@ export default function RecommendationCard({ rec, rank }) {
 
       {/* Reason */}
       <div className="px-4 pb-3">
-        <p className="text-vault-textDim text-xs leading-relaxed">{rec.reason}</p>
-        {!rec.eligible && (
-          <span className="inline-block mt-1.5 text-xs bg-amber-900/30 text-amber-400
-                           border border-amber-800/50 px-2 py-0.5 rounded-full">
-            ⚠ May need eligibility check
-          </span>
+        {rec.top_reasons && rec.top_reasons.length > 0 ? (
+          <ul className="space-y-1">
+            {rec.top_reasons.map((line, i) => (
+              <li key={i} className="text-vault-textDim text-xs leading-relaxed flex items-start gap-1.5">
+                <span className="text-vault-gold mt-0.5">→</span>
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-vault-textDim text-xs leading-relaxed">{rec.reason}</p>
         )}
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {rec.fee_waived && rec.annual_fee > 0 && (
+            <span className="text-xs bg-emerald-900/30 text-emerald-400 border border-emerald-800/50 px-2 py-0.5 rounded-full">
+              ✓ Fee waived
+            </span>
+          )}
+          {rec.lounge_domestic > 0 && (
+            <span className="text-xs bg-sky-900/30 text-sky-400 border border-sky-800/50 px-2 py-0.5 rounded-full">
+              ✈ {rec.lounge_domestic} lounges/yr
+            </span>
+          )}
+          {rec.forex_markup_pct > 0 && rec.forex_markup_pct < 2.5 && (
+            <span className="text-xs bg-purple-900/30 text-purple-300 border border-purple-800/50 px-2 py-0.5 rounded-full">
+              🌍 {rec.forex_markup_pct}% forex
+            </span>
+          )}
+          {!rec.eligible && (
+            <span className="text-xs bg-amber-900/30 text-amber-400 border border-amber-800/50 px-2 py-0.5 rounded-full">
+              ⚠ Eligibility check needed
+            </span>
+          )}
+        </div>
       </div>
 
       {/* SHAP breakdown toggle */}

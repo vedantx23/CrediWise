@@ -135,6 +135,18 @@ def get_all_rewards_map() -> dict[str, dict[str, float]]:
     return result
 
 
+def get_all_caps_map() -> dict[str, dict[str, float | None]]:
+    """
+    Returns {card_id: {category: monthly_cap_inr or None}}.
+    None means no cap; a numeric value caps the cashback for that category.
+    """
+    rows = query("SELECT card_id, category, monthly_cap_inr FROM reward_categories")
+    result: dict[str, dict[str, float | None]] = {}
+    for row in rows:
+        result.setdefault(row["card_id"], {})[row["category"]] = row["monthly_cap_inr"]
+    return result
+
+
 def get_user(user_id: str) -> dict | None:
     rows = query("SELECT * FROM users WHERE user_id = ?", (user_id,))
     return rows[0] if rows else None

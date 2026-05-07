@@ -243,7 +243,7 @@ class TestRunAuditIntegration:
     def test_status_is_valid(self):
         profile = {"monthly_spend": STANDARD_SPEND, "current_cards": [], "income_annual": 0, "cibil_score": 700}
         result = run_audit(profile)
-        assert result["status"] in ("pass", "warning", "critical")
+        assert result["status"] in ("pass", "warning", "critical", "unaudited")
 
     def test_no_current_cards_gives_max_leakage(self):
         profile = {"monthly_spend": STANDARD_SPEND, "current_cards": [], "income_annual": 0, "cibil_score": 700}

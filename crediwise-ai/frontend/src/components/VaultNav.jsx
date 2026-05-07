@@ -2,17 +2,19 @@ import { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
   Home, ShieldCheck, CreditCard, Fingerprint,
-  FileText, Users, TrendingUp,
+  FileText, Users, TrendingUp, MessagesSquare, Bell,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/',          icon: Home,         label: 'Home' },
-  { to: '/audit',     icon: ShieldCheck,  label: 'Audit' },
-  { to: '/persona',   icon: Fingerprint,  label: 'Persona' },
-  { to: '/approval',  icon: CreditCard,   label: 'Cards' },
-  { to: '/simulator', icon: TrendingUp,   label: 'Life Events' },
-  { to: '/community', icon: Users,        label: 'Community' },
-  { to: '/report',    icon: FileText,     label: 'Reports' },
+  { to: '/',          icon: Home,            label: 'Home' },
+  { to: '/audit',     icon: ShieldCheck,     label: 'Audit' },
+  { to: '/persona',   icon: Fingerprint,     label: 'Persona' },
+  { to: '/approval',  icon: CreditCard,      label: 'Cards' },
+  { to: '/boardroom', icon: MessagesSquare,  label: 'Boardroom' },
+  { to: '/lifecycle', icon: Bell,            label: 'Lifecycle' },
+  { to: '/simulator', icon: TrendingUp,      label: 'Life Events' },
+  { to: '/community', icon: Users,           label: 'Community' },
+  { to: '/report',    icon: FileText,        label: 'Reports' },
 ]
 
 export default function VaultNav() {

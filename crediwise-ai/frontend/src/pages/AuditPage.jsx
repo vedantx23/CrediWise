@@ -6,9 +6,9 @@ import SpendDial from '../components/SpendDial'
 import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
 import { useToast } from '../components/VaultToast'
 import { inr } from '../utils/format'
+import { useUserProfile, PROFILE_CATEGORIES } from '../context/UserProfileContext'
 
-const CATEGORIES = ['dining','fuel','grocery','travel','online','utilities','international','other']
-const DEFAULT_SPEND = Object.fromEntries(CATEGORIES.map(c => [c, '']))
+const CATEGORIES = PROFILE_CATEGORIES
 
 const SCANNING_LINES = [
   '> initializing shadow audit engine...',
@@ -47,8 +47,16 @@ function TypeLine({ text, speed = 35, onDone }) {
 }
 
 export default function AuditPage() {
-  const [spend, setSpend] = useState(DEFAULT_SPEND)
-  const [cards, setCards] = useState('')
+  const { profile, updateProfile, updateSpend, asPayload } = useUserProfile()
+  const spend  = profile.monthly_spend
+  const income = profile.income_annual
+  const cibil  = profile.cibil_score
+  const cards  = (profile.current_cards || []).join(', ')
+
+  const setCards = (str) => updateProfile({
+    current_cards: str.split(',').map(s => s.trim()).filter(Boolean)
+  })
+
   const [phase, setPhase] = useState('idle') // idle | scanning | result
   const [scanLine, setScanLine] = useState(0)
   const [result, setResult] = useState(null)
@@ -61,19 +69,20 @@ export default function AuditPage() {
 
   const handleSubmit = async e => {
     e.preventDefault()
+    if (totalSpend <= 0) {
+      toast.add('Please enter your monthly spending in at least one category.', 'error')
+      return
+    }
+    if (!income || Number(income) <= 0) {
+      toast.add('Please enter your annual income to filter eligible cards.', 'error')
+      return
+    }
     setPhase('scanning')
     setScanLine(0)
     setResult(null)
 
-    const profile = {
-      monthly_spend: Object.fromEntries(
-        Object.entries(spend).map(([k, v]) => [k, Number(v) || 0])
-      ),
-      current_cards: cards.split(',').map(s => s.trim()).filter(Boolean),
-      income_annual: 0, cibil_score: 700,
-    }
     try {
-      const res = await runAudit(profile)
+      const res = await runAudit(asPayload())
       // Wait for scanning animation (3 lines × ~1s)
       setTimeout(() => {
         setResult(res)
@@ -114,8 +123,8 @@ export default function AuditPage() {
                     currency
                     type="number"
                     placeholder="0"
-                    value={spend[cat]}
-                    onChange={e => setSpend(s => ({ ...s, [cat]: e.target.value }))}
+                    value={spend[cat] ?? ''}
+                    onChange={e => updateSpend(cat, e.target.value)}
                   />
                 ))}
               </div>
@@ -125,6 +134,23 @@ export default function AuditPage() {
                 value={cards}
                 onChange={e => setCards(e.target.value)}
               />
+              <div className="spend-grid">
+                <VaultInput
+                  label="Annual Income (₹)"
+                  currency
+                  type="number"
+                  placeholder="600000"
+                  value={income}
+                  onChange={e => updateProfile({ income_annual: e.target.value })}
+                />
+                <VaultInput
+                  label="CIBIL Score (300–900)"
+                  type="number"
+                  placeholder="750"
+                  value={cibil}
+                  onChange={e => updateProfile({ cibil_score: e.target.value })}
+                />
+              </div>
               <VaultButton type="submit" loading={phase === 'scanning'}>
                 Run Audit
               </VaultButton>

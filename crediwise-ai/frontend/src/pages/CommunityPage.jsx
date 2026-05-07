@@ -33,7 +33,7 @@ function Leaderboard() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get("/api/leaderboard/cities").then(({ data }) => {
+    api.get("/leaderboard/cities").then(({ data }) => {
       if (data.success) setCities(data.data.all_cities || []);
     });
     fetchBoard();
@@ -46,7 +46,7 @@ function Leaderboard() {
       if (c) params.set("city", c);
       if (p) params.set("persona", p);
       params.set("top_n", "10");
-      const { data } = await api.get(`/api/leaderboard?${params}`);
+      const { data } = await api.get(`/leaderboard?${params}`);
       if (data.success) setCombos(data.data.combos);
     } finally {
       setLoading(false);
@@ -142,7 +142,7 @@ function SubmitStack() {
 
     setLoading(true);
     try {
-      const { data } = await api.post("/api/submit-combo", {
+      const { data } = await api.post("/submit-combo", {
         cards:     cardList,
         city,
         persona,
@@ -237,7 +237,7 @@ function OfferVotes() {
     setLoading(true);
     try {
       const params = cardId ? `?card_id=${cardId}` : "";
-      const { data } = await api.get(`/api/offers${params}`);
+      const { data } = await api.get(`/offers${params}`);
       if (data.success) setOffers(data.data.offers);
     } finally {
       setLoading(false);
@@ -248,7 +248,7 @@ function OfferVotes() {
 
   const handleVote = async (offerId, vote) => {
     try {
-      const { data } = await api.post("/api/vote", { offer_id: offerId, vote });
+      const { data } = await api.post("/vote", { offer_id: offerId, vote });
       if (data.success) {
         setOffers(prev => prev.map(o =>
           o.offer_id === offerId ? { ...o, ...data.data } : o
@@ -261,7 +261,7 @@ function OfferVotes() {
     if (!newOffer.card_id || !newOffer.offer_text) return;
     setCreating(true);
     try {
-      const { data } = await api.post("/api/offers", {
+      const { data } = await api.post("/offers", {
         card_id:    newOffer.card_id,
         offer_text: newOffer.offer_text,
         offer_rate: newOffer.offer_rate ? +newOffer.offer_rate : undefined,

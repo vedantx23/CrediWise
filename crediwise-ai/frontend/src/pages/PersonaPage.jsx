@@ -7,32 +7,28 @@ import HoloCard from '../components/HoloCard'
 import { ScrollReveal } from '../hooks/useScrollReveal.jsx'
 import { useToast } from '../components/VaultToast'
 import { inr } from '../utils/format'
+import { useUserProfile, PROFILE_CATEGORIES } from '../context/UserProfileContext'
 
-const CATEGORIES = ['dining','fuel','grocery','travel','online','utilities','international','other']
-const DEFAULT_SPEND = Object.fromEntries(CATEGORIES.map(c => [c, '']))
+const CATEGORIES = PROFILE_CATEGORIES
 
 export default function PersonaPage() {
-  const [spend, setSpend]       = useState(DEFAULT_SPEND)
-  const [income, setIncome]     = useState('')
-  const [cibil, setCibil]       = useState('')
+  const { profile, updateProfile, updateSpend, asPayload } = useUserProfile()
   const [loading, setLoading]   = useState(false)
   const [scanning, setScanning] = useState(false)
   const [result, setResult]     = useState(null)
   const toast = useToast()
+
+  // Hydrate from shared profile (persists across pages + reloads)
+  const spend  = profile.monthly_spend
+  const income = profile.income_annual
+  const cibil  = profile.cibil_score
 
   const handleSubmit = async e => {
     e.preventDefault()
     setLoading(true)
     setResult(null)
     try {
-      const res = await runPersona({
-        monthly_spend: Object.fromEntries(
-          Object.entries(spend).map(([k,v]) => [k, Number(v)||0])
-        ),
-        income_annual: Number(income)||0,
-        cibil_score:   Number(cibil)||700,
-        current_cards: [],
-      })
+      const res = await runPersona(asPayload())
       setScanning(true)
       setTimeout(() => {
         setLoading(false)
@@ -47,7 +43,7 @@ export default function PersonaPage() {
   return (
     <div style={{ padding:'40px 48px', maxWidth:1200 }}>
       {scanning && result && (
-        <PersonaScan persona={result.persona} onDone={() => setScanning(false)} />
+        <PersonaScan persona={result.persona_name || result.persona} onDone={() => setScanning(false)} />
       )}
 
       <h1 className="vault-heading">Persona Engine</h1>
@@ -64,13 +60,13 @@ export default function PersonaPage() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               {CATEGORIES.map(cat => (
                 <VaultInput key={cat} label={cat} currency type="number" placeholder="0"
-                  value={spend[cat]} onChange={e => setSpend(s => ({...s,[cat]:e.target.value}))} />
+                  value={spend[cat] ?? ''} onChange={e => updateSpend(cat, e.target.value)} />
               ))}
             </div>
             <VaultInput label="Annual Income (₹)" currency type="number" placeholder="1200000"
-              value={income} onChange={e => setIncome(e.target.value)} />
+              value={income} onChange={e => updateProfile({ income_annual: e.target.value })} />
             <VaultInput label="CIBIL Score" type="number" placeholder="740"
-              value={cibil} onChange={e => setCibil(e.target.value)} />
+              value={cibil} onChange={e => updateProfile({ cibil_score: e.target.value })} />
             <VaultButton type="submit" loading={loading}>Reveal My Persona</VaultButton>
           </form>
         </VaultCard>
@@ -89,11 +85,21 @@ export default function PersonaPage() {
               <VaultCard active>
                 <div style={{ textAlign:'center', padding:'12px 0' }}>
                   <div style={{ fontFamily:'var(--font-display)', fontWeight:300, fontSize:'clamp(28px,4vw,48px)', color:'var(--gold-bright)', letterSpacing:'0.08em', animation:'persona-bounce 500ms var(--ease-snap)' }}>
-                    {result.persona}
+                    {result.persona_emoji ? `${result.persona_emoji} ` : ''}{result.persona_name || result.persona || 'Unclassified'}
                   </div>
+                  {result.tagline && (
+                    <div style={{ fontFamily:'var(--font-ui)', fontWeight:300, fontSize:13, color:'var(--plat-cool)', marginTop:6, fontStyle:'italic' }}>
+                      {result.tagline}
+                    </div>
+                  )}
                   <div style={{ fontFamily:'var(--font-ui)', fontWeight:300, fontSize:14, color:'var(--plat-cool)', marginTop:8 }}>
                     Confidence: <span style={{ color:'var(--gold-hot)', fontFamily:'var(--font-mono)' }}>{(result.confidence * 100).toFixed(0)}%</span>
                   </div>
+                  {result.fallback && (
+                    <div style={{ fontSize:12, color:'#fb7185', marginTop:8 }}>
+                      ⚠ Add monthly spend to get a real classification.
+                    </div>
+                  )}
                 </div>
               </VaultCard>
 
